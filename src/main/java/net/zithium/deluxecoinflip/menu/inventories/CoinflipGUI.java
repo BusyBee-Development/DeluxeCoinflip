@@ -150,14 +150,19 @@ public class CoinflipGUI implements Listener {
                     scheduler.runTask(() -> {
                         economyManager.getEconomyProvider(game.getProvider()).deposit(winner, providedWinAmount);
                         Bukkit.getPluginManager().callEvent(new CoinflipCompletedEvent(winner, loser, providedWinAmount));
+
+                        plugin.getGameManager().removeCoinflipGame(winner.getUniqueId());
+                        plugin.getGameManager().removeCoinflipGame(loser.getUniqueId());
                     });
 
-                    if (config.getBoolean("discord.webhook.enabled", false) || config.getBoolean("discord.bot.enabled", false))
-                        plugin.getDiscordHook().executeWebhook(winner, loser, economyManager.getEconomyProvider(game.getProvider()).getDisplayName(), winAmount).exceptionally(throwable -> {
+                    if (config.getBoolean("discord.webhook.enabled", false) || config.getBoolean("discord.bot.enabled", false)) {
+                        plugin.getDiscordHook().executeWebhook(winner, loser, economyManager.getEconomyProvider(game.getProvider()).getDisplayName(), winAmount
+                        ).exceptionally(throwable -> {
                             plugin.getLogger().severe("An error occurred when triggering the webhook.");
                             throwable.printStackTrace();
                             return null;
                         });
+                    }
 
                     // Update player stats
                     StorageManager storageManager = plugin.getStorageManager();
