@@ -151,8 +151,7 @@ public class CoinflipGUI implements Listener {
                         economyManager.getEconomyProvider(game.getProvider()).deposit(winner, providedWinAmount);
                         Bukkit.getPluginManager().callEvent(new CoinflipCompletedEvent(winner, loser, providedWinAmount));
 
-                        plugin.getGameManager().removeCoinflipGame(winner.getUniqueId());
-                        plugin.getGameManager().removeCoinflipGame(loser.getUniqueId());
+                        plugin.getGameManager().removeCoinflipGame(game.getPlayerUUID());
                     });
 
                     if (config.getBoolean("discord.webhook.enabled", false) || config.getBoolean("discord.bot.enabled", false)) {
