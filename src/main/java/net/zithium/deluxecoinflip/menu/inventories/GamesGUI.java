@@ -205,6 +205,7 @@ public class GamesGUI {
                         return;
                     }
 
+                    gameManager.removeCoinflipGame(playerFromID.getUniqueId());
                     economyManager.getEconomyProvider(game.getProvider()).withdraw(player, game.getAmount());
 
                     plugin.getScheduler().runTaskAtEntity(player, () -> {

@@ -87,6 +87,7 @@ public class CoinflipGUI implements Listener {
         Gui winnerGui = createGameGui();
         Gui loserGui = createGameGui();
 
+        game.setInProgress(true);
         this.gameAnimationRunner.runAnimation(winner, loser, game, winnerGui, loserGui);
     }
 

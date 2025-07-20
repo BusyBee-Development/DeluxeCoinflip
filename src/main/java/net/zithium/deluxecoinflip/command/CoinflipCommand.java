@@ -123,10 +123,14 @@ public class CoinflipCommand extends BaseCommand {
         if (gameManager.getCoinflipGames().containsKey(uuid)) {
             final CoinflipGame game = gameManager.getCoinflipGames().get(uuid);
 
+            if (game.isInProgress()) {
+                Messages.ERROR_GAME_UNAVAILABLE.send(player);
+                return;
+            }
+
             economyManager.getEconomyProvider(game.getProvider()).deposit(player, game.getAmount());
             gameManager.removeCoinflipGame(uuid);
             Messages.DELETED_GAME.send(player);
-
         } else {
             Messages.GAME_NOT_FOUND.send(player);
         }
