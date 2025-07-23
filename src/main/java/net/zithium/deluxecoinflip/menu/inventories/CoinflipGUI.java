@@ -151,7 +151,6 @@ public class CoinflipGUI implements Listener {
                     scheduler.runTask(() -> {
                         economyManager.getEconomyProvider(game.getProvider()).deposit(winner, providedWinAmount);
                         Bukkit.getPluginManager().callEvent(new CoinflipCompletedEvent(winner, loser, providedWinAmount));
-
                         plugin.getGameManager().removeCoinflipGame(game.getPlayerUUID());
                     });
 
