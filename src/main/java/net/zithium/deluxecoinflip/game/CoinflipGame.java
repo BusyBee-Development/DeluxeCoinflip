@@ -22,8 +22,6 @@ public class CoinflipGame {
     private long amount;
     private ItemStack cachedHead;
 
-    private boolean inProgress = false;
-
     public CoinflipGame(UUID uuid, String provider, long amount) {
         this.uuid = uuid;
         this.provider = provider;
@@ -57,10 +55,6 @@ public class CoinflipGame {
         if (this.amount < 0) this.amount = 0;
     }
 
-    public boolean isInProgress() {
-        return inProgress;
-    }
-
     public OfflinePlayer getOfflinePlayer() {
         return player;
     }
@@ -75,10 +69,6 @@ public class CoinflipGame {
 
     public void setProvider(String provider) {
         this.provider = provider;
-    }
-
-    public void setInProgress(boolean inProgress) {
-        this.inProgress = inProgress;
     }
 
     public CoinflipGame clone() {
