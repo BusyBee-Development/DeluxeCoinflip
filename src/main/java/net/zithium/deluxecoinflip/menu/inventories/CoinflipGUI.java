@@ -16,6 +16,7 @@ import net.zithium.deluxecoinflip.config.Messages;
 import net.zithium.deluxecoinflip.economy.EconomyManager;
 import net.zithium.deluxecoinflip.game.CoinflipGame;
 import net.zithium.deluxecoinflip.game.GameAnimationRunner;
+import net.zithium.deluxecoinflip.storage.PendingResult;
 import net.zithium.deluxecoinflip.storage.PlayerData;
 import net.zithium.deluxecoinflip.storage.StorageManager;
 import net.zithium.deluxecoinflip.utility.ItemStackBuilder;
@@ -77,7 +78,7 @@ public class CoinflipGUI implements Listener {
         List<OfflinePlayer> players = new ArrayList<>(Arrays.asList(creator, opponent));
         Collections.shuffle(players, random);
 
-        creator = (Player) players.get(0);
+        creator = players.get(0).getPlayer();
         opponent = players.get(1);
 
         OfflinePlayer winner = players.get(random.nextInt(players.size()));
@@ -97,8 +98,8 @@ public class CoinflipGUI implements Listener {
     }
 
     public void startAnimation(WrappedScheduler scheduler, Gui gui, GuiItem winnerHead, GuiItem loserHead,
-                                OfflinePlayer winner, OfflinePlayer loser, CoinflipGame game,
-                                Player targetPlayer, Location regionLoc, boolean isWinnerThread) {
+                               OfflinePlayer winner, OfflinePlayer loser, CoinflipGame game,
+                               Player targetPlayer, Location regionLoc, boolean isWinnerThread) {
 
         ConfigurationSection animationConfig1 = plugin.getConfig().getConfigurationSection("coinflip-gui.animation.1");
         ConfigurationSection animationConfig2 = plugin.getConfig().getConfigurationSection("coinflip-gui.animation.2");
@@ -146,48 +147,59 @@ public class CoinflipGUI implements Listener {
                 }
 
                 if (isWinnerThread) {
+                    long taxedPercentage = taxed;
                     long providedWinAmount = finalWinAmount;
+                    if (!winner.isOnline()) {
+                        plugin.getPendingResultManager().save(winner.getUniqueId(), new PendingResult(
+                            winner.getUniqueId(), providedWinAmount, beforeTax, taxed, game.getProvider(), loser.getUniqueId()
+                        ));
+
+                        plugin.getGameManager().removeCoinflipGame(game.getPlayerUUID());
+                        return;
+                    }
+
                     scheduler.runTask(() -> {
                         economyManager.getEconomyProvider(game.getProvider()).deposit(winner, providedWinAmount);
                         Bukkit.getPluginManager().callEvent(new CoinflipCompletedEvent(winner, loser, providedWinAmount));
                         plugin.getGameManager().removeCoinflipGame(game.getPlayerUUID());
+
+                        // Update player stats
+                        StorageManager storageManager = plugin.getStorageManager();
+                        updatePlayerStats(storageManager, winner, providedWinAmount, beforeTax, true);
+                        updatePlayerStats(storageManager, loser, 0, beforeTax, false);
+
+                        // Send messages
+                        String winAmountFormatted = TextUtil.numberFormat(providedWinAmount);
+                        String taxedFormatted = TextUtil.numberFormat(taxedPercentage);
+
+                        if (winner.isOnline()) {
+                            Messages.GAME_SUMMARY_WIN.send(winner.getPlayer(), replacePlaceholders(
+                                    String.valueOf(taxRate), taxedFormatted, winner.getName(), loser.getName(),
+                                    economyManager.getEconomyProvider(game.getProvider()).getDisplayName(), winAmountFormatted
+                            ));
+                        }
+
+                        if (loser.isOnline()) {
+                            Messages.GAME_SUMMARY_LOSS.send(loser.getPlayer(), replacePlaceholders(
+                                    String.valueOf(taxRate), taxedFormatted, winner.getName(), loser.getName(),
+                                    economyManager.getEconomyProvider(game.getProvider()).getDisplayName(), winAmountFormatted
+                            ));
+                        }
+
+                        // Broadcast
+                        broadcastWinningMessage(providedWinAmount, taxedPercentage, winner.getName(), loser.getName(),
+                                economyManager.getEconomyProvider(game.getProvider()).getDisplayName());
+
+                        // Discord hook
+                        if (config.getBoolean("discord.webhook.enabled", false) || config.getBoolean("discord.bot.enabled", false)) {
+                            plugin.getDiscordHook().executeWebhook(winner, loser,
+                                    economyManager.getEconomyProvider(game.getProvider()).getDisplayName(), winAmount).exceptionally(throwable -> {
+                                plugin.getLogger().severe("An error occurred when triggering the webhook.");
+                                throwable.printStackTrace();
+                                return null;
+                            });
+                        }
                     });
-
-                    if (config.getBoolean("discord.webhook.enabled", false) || config.getBoolean("discord.bot.enabled", false)) {
-                        plugin.getDiscordHook().executeWebhook(winner, loser,
-                                economyManager.getEconomyProvider(game.getProvider()).getDisplayName(), winAmount).exceptionally(throwable -> {
-                            plugin.getLogger().severe("An error occurred when triggering the webhook.");
-                            throwable.printStackTrace();
-                            return null;
-                        });
-                    }
-
-                    // Update player stats
-                    StorageManager storageManager = plugin.getStorageManager();
-                    updatePlayerStats(storageManager, winner, finalWinAmount, beforeTax, true);
-                    updatePlayerStats(storageManager, loser, 0, beforeTax, false);
-
-                    // Send messages
-                    String winAmountFormatted = TextUtil.numberFormat(finalWinAmount);
-                    String taxedFormatted = TextUtil.numberFormat(taxed);
-
-                    if (winner.isOnline()) {
-                        Messages.GAME_SUMMARY_WIN.send(winner.getPlayer(), replacePlaceholders(
-                                String.valueOf(taxRate), taxedFormatted, winner.getName(), loser.getName(),
-                                economyManager.getEconomyProvider(game.getProvider()).getDisplayName(), winAmountFormatted
-                        ));
-                    }
-
-                    if (loser.isOnline()) {
-                        Messages.GAME_SUMMARY_LOSS.send(loser.getPlayer(), replacePlaceholders(
-                                String.valueOf(taxRate), taxedFormatted, winner.getName(), loser.getName(),
-                                economyManager.getEconomyProvider(game.getProvider()).getDisplayName(), winAmountFormatted
-                        ));
-                    }
-
-                    // Broadcast results
-                    broadcastWinningMessage(finalWinAmount, taxed, winner.getName(), loser.getName(),
-                            economyManager.getEconomyProvider(game.getProvider()).getDisplayName());
                 }
 
                 return;

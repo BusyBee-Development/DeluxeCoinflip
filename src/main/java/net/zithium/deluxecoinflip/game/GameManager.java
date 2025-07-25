@@ -26,6 +26,7 @@ public class GameManager {
         this.coinflipGames = new HashMap<>();
         this.storageManager = plugin.getStorageManager();
     }
+
     /**
      * Add a coinflip game
      *

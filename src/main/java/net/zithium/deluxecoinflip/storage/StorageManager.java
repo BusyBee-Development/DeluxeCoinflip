@@ -11,6 +11,7 @@ import net.zithium.deluxecoinflip.exception.InvalidStorageHandlerException;
 import net.zithium.deluxecoinflip.game.CoinflipGame;
 import net.zithium.deluxecoinflip.storage.handler.StorageHandler;
 import net.zithium.deluxecoinflip.storage.handler.impl.SQLiteHandler;
+import net.zithium.deluxecoinflip.utility.TextUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.event.EventHandler;
@@ -48,19 +49,59 @@ public class StorageManager {
             return;
         }
 
-        Stream.of(
-                new Listener() {
-                    @EventHandler(priority = EventPriority.MONITOR)
-                    public void onPlayerJoin(final PlayerJoinEvent event) {
-                        loadPlayerData(event.getPlayer().getUniqueId());
-                    }
+        Stream.of(new Listener() {
+            @EventHandler(priority = EventPriority.MONITOR)
+            public void onPlayerJoin(final PlayerJoinEvent event) {
+                UUID uuid = event.getPlayer().getUniqueId();
+                loadPlayerData(uuid);
 
-                }, new Listener() {
-                    @EventHandler(priority = EventPriority.MONITOR)
-                    public void onPlayerQuit(final PlayerQuitEvent event) {
-                        getPlayer(event.getPlayer().getUniqueId()).ifPresent(data -> savePlayerData(data, true));
-                    }
-                }).forEach(listener -> plugin.getServer().getPluginManager().registerEvents(listener, plugin));
+                PendingResultManager pending = plugin.getPendingResultManager();
+                if (pending.has(uuid)) {
+                    PendingResult result = pending.get(uuid);
+
+                    plugin.getScheduler().runTask(() -> {
+                        OfflinePlayer winner = Bukkit.getOfflinePlayer(result.player());
+                        OfflinePlayer loser = Bukkit.getOfflinePlayer(result.loser());
+
+                        plugin.getEconomyManager()
+                                .getEconomyProvider(result.provider())
+                                .deposit(winner, result.amount());
+
+                        plugin.getStorageManager().updateOfflinePlayerWin(winner.getUniqueId(), result.amount(), result.beforeTax());
+                        plugin.getStorageManager().updateOfflinePlayerLoss(loser.getUniqueId(), result.beforeTax());
+
+                        double taxRate = plugin.getConfig().getDouble("settings.tax.rate");
+
+                        Messages.GAME_SUMMARY_WIN.send(event.getPlayer(),
+                                "{TAX_RATE}", String.valueOf(taxRate),
+                                "{TAX_DEDUCTION}", TextUtil.numberFormat(result.taxedAmount()),
+                                "{WINNER}", winner.getName(),
+                                "{LOSER}", loser.getName(),
+                                "{CURRENCY}", plugin.getEconomyManager().getEconomyProvider(result.provider()).getDisplayName(),
+                                "{WINNINGS}", TextUtil.numberFormat(result.amount()));
+
+                        if (uuid.equals(result.loser())) {
+                            Messages.GAME_SUMMARY_LOSS.send(event.getPlayer(),
+                                    "{TAX_RATE}", String.valueOf(taxRate),
+                                    "{TAX_DEDUCTION}", TextUtil.numberFormat(result.taxedAmount()),
+                                    "{WINNER}", winner.getName(),
+                                    "{LOSER}", loser.getName(),
+                                    "{CURRENCY}", plugin.getEconomyManager().getEconomyProvider(result.provider()).getDisplayName(),
+                                    "{WINNINGS}", TextUtil.numberFormat(result.amount()));
+                        }
+
+                        pending.clear(uuid);
+                    });
+                }
+            }
+
+            }, new Listener() {
+                @EventHandler(priority = EventPriority.MONITOR)
+                public void onPlayerQuit(final PlayerQuitEvent event) {
+                    getPlayer(event.getPlayer().getUniqueId()).ifPresent(data -> savePlayerData(data, true));
+                }
+            }
+        ).forEach(listener -> plugin.getServer().getPluginManager().registerEvents(listener, plugin));
 
         Bukkit.getOnlinePlayers().forEach(player -> loadPlayerData(player.getUniqueId()));
     }
@@ -92,27 +133,34 @@ public class StorageManager {
     }
 
     public void loadPlayerData(UUID uuid) {
-        DeluxeCoinflipPlugin.getInstance().getScheduler().runTaskAsynchronously(() -> playerDataMap.put(uuid, storageHandler.getPlayer(uuid)));
-        DeluxeCoinflipPlugin.getInstance().getScheduler().runTaskAsynchronously(() -> {
-            playerDataMap.put(uuid, storageHandler.getPlayer(uuid));
+        plugin.getScheduler().runTaskAsynchronously(() -> {
+            PlayerData data = storageHandler.getPlayer(uuid);
+            playerDataMap.put(uuid, data);
 
             CoinflipGame game = storageHandler.getCoinflipGame(uuid);
             if (game != null) {
                 plugin.getScheduler().runTask(() -> {
                     OfflinePlayer player = Bukkit.getOfflinePlayer(uuid);
-                    plugin.getEconomyManager().getEconomyProvider(game.getProvider()).deposit(player, game.getAmount());
-                    Messages.GAME_REFUNDED.send(player.getPlayer(), "{AMOUNT}", game.getAmount(), "{PROVIDER}", game.getProvider());
-                });
+                    plugin.getEconomyManager()
+                            .getEconomyProvider(game.getProvider())
+                            .deposit(player, game.getAmount());
 
-                storageHandler.deleteCoinfip(uuid);
-                plugin.getGameManager().removeCoinflipGame(uuid);
+                    if (player.isOnline()) {
+                        Messages.GAME_REFUNDED.send(player.getPlayer(),
+                                "{AMOUNT}", game.getAmount(),
+                                "{PROVIDER}", game.getProvider());
+                    }
+
+                    plugin.getGameManager().removeCoinflipGame(uuid);
+                    storageHandler.deleteCoinfip(uuid);
+                });
             }
         });
     }
 
     public void savePlayerData(PlayerData player, boolean removeCache) {
         UUID uuid = player.getUUID();
-        DeluxeCoinflipPlugin.getInstance().getScheduler().runTaskAsynchronously(() -> {
+        plugin.getScheduler().runTaskAsynchronously(() -> {
             storageHandler.savePlayer(player);
             if (removeCache) playerDataMap.remove(uuid);
         });

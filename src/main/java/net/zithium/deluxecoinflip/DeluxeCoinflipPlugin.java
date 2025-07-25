@@ -22,6 +22,7 @@ import net.zithium.deluxecoinflip.hook.DiscordHook;
 import net.zithium.deluxecoinflip.hook.PlaceholderAPIHook;
 import net.zithium.deluxecoinflip.listener.PlayerChatListener;
 import net.zithium.deluxecoinflip.menu.InventoryManager;
+import net.zithium.deluxecoinflip.storage.PendingResultManager;
 import net.zithium.deluxecoinflip.storage.PlayerData;
 import net.zithium.deluxecoinflip.storage.StorageManager;
 import org.bstats.bukkit.Metrics;
@@ -46,6 +47,7 @@ public class DeluxeCoinflipPlugin extends FoliaWrappedJavaPlugin implements Delu
 
     private Map<ConfigType, ConfigHandler> configMap;
     private StorageManager storageManager;
+    private PendingResultManager pendingResultManager = new PendingResultManager();
     private GameManager gameManager;
     private InventoryManager inventoryManager;
     private EconomyManager economyManager;
@@ -152,6 +154,10 @@ public class DeluxeCoinflipPlugin extends FoliaWrappedJavaPlugin implements Delu
 
     public StorageManager getStorageManager() {
         return storageManager;
+    }
+
+    public PendingResultManager getPendingResultManager() {
+        return pendingResultManager;
     }
 
     public InventoryManager getInventoryManager() {
