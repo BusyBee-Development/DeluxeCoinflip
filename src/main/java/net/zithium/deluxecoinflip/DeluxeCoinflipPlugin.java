@@ -47,7 +47,7 @@ public class DeluxeCoinflipPlugin extends FoliaWrappedJavaPlugin implements Delu
 
     private Map<ConfigType, ConfigHandler> configMap;
     private StorageManager storageManager;
-    private PendingResultManager pendingResultManager = new PendingResultManager();
+    private PendingResultManager pendingResultManager;
     private GameManager gameManager;
     private InventoryManager inventoryManager;
     private EconomyManager economyManager;
@@ -88,6 +88,8 @@ public class DeluxeCoinflipPlugin extends FoliaWrappedJavaPlugin implements Delu
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
+
+        pendingResultManager = new PendingResultManager(this);
 
         discordHook = new DiscordHook(this);
 
@@ -133,7 +135,11 @@ public class DeluxeCoinflipPlugin extends FoliaWrappedJavaPlugin implements Delu
 
     @Override
     public void onDisable() {
-        if (storageManager != null) storageManager.onDisable(true);
+        if (storageManager != null) {
+            storageManager.onDisable(true);
+        }
+
+        pendingResultManager.getAll().clear();
     }
 
     // Plugin reload handling

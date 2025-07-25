@@ -186,7 +186,7 @@ public class CoinflipGUI implements Listener {
                             ));
                         }
 
-                        // Broadcast
+                        // Broadcast results
                         broadcastWinningMessage(providedWinAmount, taxedPercentage, winner.getName(), loser.getName(),
                                 economyManager.getEconomyProvider(game.getProvider()).getDisplayName());
 
