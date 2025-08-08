@@ -61,35 +61,9 @@ public class StorageManager {
                 },
 
                 new Listener() {
-                    @EventHandler(priority = EventPriority.HIGHEST)
+                    @EventHandler(priority = EventPriority.MONITOR)
                     public void onPlayerQuit(final PlayerQuitEvent event) {
-                        UUID quitterId = event.getPlayer().getUniqueId();
-
-                        getPlayer(quitterId).ifPresent(data -> savePlayerData(data, true));
-
-                        GameManager gameManager = plugin.getGameManager();
-
-                        Optional<UUID> ownerOpt = gameManager.getOwnerFor(quitterId);
-
-                        if (ownerOpt.isEmpty()) {
-                            CoinflipGame game = gameManager.getCoinflipGames().get(quitterId);
-                            if (game != null) {
-                                cancelAndRefund(game, quitterId, null);
-                            }
-
-                            return;
-                        }
-
-                        UUID ownerId = ownerOpt.get();
-
-                        UUID opponentId = gameManager.getOpponent(quitterId).orElse(null);
-
-                        CoinflipGame liveGame = gameManager.getCoinflipGames().get(ownerId);
-                        if (liveGame == null) {
-                            return;
-                        }
-
-                        cancelAndRefund(liveGame, ownerId, opponentId);
+                        getPlayer(event.getPlayer().getUniqueId()).ifPresent(data -> savePlayerData(data, true));
                     }
                 }
         ).forEach(listener -> plugin.getServer().getPluginManager().registerEvents(listener, plugin));
@@ -142,8 +116,8 @@ public class StorageManager {
                                 "{PROVIDER}", game.getProvider());
                     }
 
-                    plugin.getGameManager().removeCoinflipGame(uuid);
                     storageHandler.deleteCoinfip(uuid);
+                    plugin.getGameManager().removeCoinflipGame(uuid);
                 });
             }
         });
@@ -165,56 +139,5 @@ public class StorageManager {
 
     public StorageHandler getStorageHandler() {
         return storageHandler;
-    }
-
-    private void cancelAndRefund(CoinflipGame game, UUID ownerId, UUID opponentId) {
-        plugin.getScheduler().runTask(() -> {
-            game.cancel();
-
-            Player ownerPlayer = Bukkit.getPlayer(ownerId);
-            if (ownerPlayer != null) {
-                plugin.getScheduler().runTaskAtEntity(ownerPlayer, ownerPlayer::closeInventory);
-            }
-
-            if (opponentId != null) {
-                Player opponentPlayer = Bukkit.getPlayer(opponentId);
-                if (opponentPlayer != null) {
-                    plugin.getScheduler().runTaskAtEntity(opponentPlayer, opponentPlayer::closeInventory);
-                }
-            }
-
-            var provider = plugin.getEconomyManager().getEconomyProvider(game.getProvider());
-            if (provider == null) {
-                return;
-            }
-
-            // Refund owner
-            OfflinePlayer owner = Bukkit.getOfflinePlayer(ownerId);
-            provider.deposit(owner, game.getAmount());
-
-            // Refund opponent if present
-            if (opponentId != null) {
-                OfflinePlayer opponent = Bukkit.getOfflinePlayer(opponentId);
-                provider.deposit(opponent, game.getAmount());
-
-                if (opponent.isOnline()) {
-                    Messages.GAME_REFUNDED.send(opponent.getPlayer(),
-                            "{AMOUNT}", NumberFormat.getNumberInstance(Locale.US).format(game.getAmount()),
-                            "{PROVIDER}", game.getProvider());
-                }
-
-                plugin.getGameManager().removeCoinflipGame(opponentId);
-            }
-
-            plugin.getGameManager().removeCoinflipGame(ownerId);
-            plugin.getGameManager().removePairByAny(ownerId);
-            storageHandler.deleteCoinfip(ownerId);
-
-            if (owner.isOnline()) {
-                Messages.GAME_REFUNDED.send(owner.getPlayer(),
-                        "{AMOUNT}", NumberFormat.getNumberInstance(Locale.US).format(game.getAmount()),
-                        "{PROVIDER}", game.getProvider());
-            }
-        });
     }
 }

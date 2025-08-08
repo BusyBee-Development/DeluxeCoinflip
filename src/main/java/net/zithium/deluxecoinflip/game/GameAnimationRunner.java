@@ -60,9 +60,5 @@ public record GameAnimationRunner(DeluxeCoinflipPlugin plugin) {
                     winner, loser, game, loserPlayer, false);
             });
         }
-
-        UUID creator = game.getPlayerUUID();
-        UUID other = isWinnerGamePlayer ? loser.getUniqueId() : winner.getUniqueId();
-        plugin.getGameManager().registerPair(creator, other);
     }
 }

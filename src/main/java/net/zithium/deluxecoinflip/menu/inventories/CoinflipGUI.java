@@ -81,9 +81,6 @@ public class CoinflipGUI implements Listener {
         creator = players.get(0).getPlayer();
         opponent = players.get(1);
 
-        // Register "pair" to ensure removal order is adequate
-        plugin.getGameManager().registerPair(game.getPlayerUUID(), opponent.getUniqueId());
-
         OfflinePlayer winner = players.get(random.nextInt(players.size()));
         OfflinePlayer loser = (winner == creator) ? opponent : creator;
 
@@ -126,18 +123,6 @@ public class CoinflipGUI implements Listener {
 
         Runnable[] task = new Runnable[1];
         task[0] = () -> {
-            if (game.isCancelled()) {
-                if (targetPlayer.isOnline()) {
-                    scheduler.runTaskAtEntity(targetPlayer, targetPlayer::closeInventory);
-                }
-
-                return;
-            }
-
-            if (!targetPlayer.isOnline()) {
-                return;
-            }
-
             if (state.count++ >= ANIMATION_COUNT_THRESHOLD) {
                 // Final state
                 gui.setItem(13, winnerHead);
@@ -159,14 +144,6 @@ public class CoinflipGUI implements Listener {
                 if (taxEnabled) {
                     taxed = (long) ((taxRate * winAmount) / 100.0);
                     finalWinAmount -= taxed;
-                }
-
-                if (game.isCancelled() || !plugin.getGameManager().getCoinflipGames().containsKey(game.getPlayerUUID())) {
-                    if (targetPlayer.isOnline()) {
-                        scheduler.runTaskAtEntity(targetPlayer, targetPlayer::closeInventory);
-                    }
-
-                    return;
                 }
 
                 if (isWinnerThread) {
@@ -201,6 +178,7 @@ public class CoinflipGUI implements Listener {
                         ));
                     }
 
+                    // Broadcast results
                     broadcastWinningMessage(finalWinAmount, taxed, winner.getName(), loser.getName(),
                             economyManager.getEconomyProvider(game.getProvider()).getDisplayName());
 
