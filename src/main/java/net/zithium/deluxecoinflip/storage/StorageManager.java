@@ -56,30 +56,30 @@ public class StorageManager {
                         loadPlayerData(event.getPlayer().getUniqueId());
                     }
 
-            }, new Listener() {
-                @EventHandler(priority = EventPriority.MONITOR)
-                public void onPlayerQuit(final PlayerQuitEvent event) {
-                    UUID quitterId = event.getPlayer().getUniqueId();
+                }, new Listener() {
+                    @EventHandler(priority = EventPriority.MONITOR)
+                    public void onPlayerQuit(final PlayerQuitEvent event) {
+                        UUID quitterId = event.getPlayer().getUniqueId();
 
-                    getPlayer(quitterId).ifPresent(data -> savePlayerData(data, true));
+                        getPlayer(quitterId).ifPresent(data -> savePlayerData(data, true));
 
-                    GameManager gameManager = plugin.getGameManager();
-                    CoinflipGame quitterGame = gameManager.getCoinflipGames().get(quitterId);
-                    if (quitterGame != null) {
-                        refundBothAndCancel(quitterGame);
-                        return;
-                    }
+                        GameManager gameManager = plugin.getGameManager();
+                        CoinflipGame quitterGame = gameManager.getCoinflipGames().get(quitterId);
+                        if (quitterGame != null) {
+                            refundBothAndCancel(quitterGame);
+                            return;
+                        }
 
-                    for (CoinflipGame g : gameManager.getCoinflipGames().values()) {
-                        if (!g.getPlayerUUID().equals(quitterId) &&
-                            g.getOfflinePlayer().getUniqueId().equals(quitterId)) {
-                            refundBothAndCancel(g);
-                            break;
+                        for (CoinflipGame g : gameManager.getCoinflipGames().values()) {
+                            if (!g.getPlayerUUID().equals(quitterId) &&
+                                g.getOfflinePlayer().getUniqueId().equals(quitterId)) {
+                                refundBothAndCancel(g);
+                                break;
+                            }
                         }
                     }
                 }
-            }
-        ).forEach(listener -> plugin.getServer().getPluginManager().registerEvents(listener, plugin));
+            ).forEach(listener -> plugin.getServer().getPluginManager().registerEvents(listener, plugin));
 
         Bukkit.getOnlinePlayers().forEach(player -> loadPlayerData(player.getUniqueId()));
     }
