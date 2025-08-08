@@ -9,9 +9,9 @@ import net.zithium.deluxecoinflip.DeluxeCoinflipPlugin;
 import net.zithium.deluxecoinflip.config.Messages;
 import net.zithium.deluxecoinflip.exception.InvalidStorageHandlerException;
 import net.zithium.deluxecoinflip.game.CoinflipGame;
+import net.zithium.deluxecoinflip.game.GameManager;
 import net.zithium.deluxecoinflip.storage.handler.StorageHandler;
 import net.zithium.deluxecoinflip.storage.handler.impl.SQLiteHandler;
-import net.zithium.deluxecoinflip.utility.TextUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.event.EventHandler;
@@ -49,56 +49,34 @@ public class StorageManager {
             return;
         }
 
-        Stream.of(new Listener() {
-            @EventHandler(priority = EventPriority.MONITOR)
-            public void onPlayerJoin(final PlayerJoinEvent event) {
-                UUID uuid = event.getPlayer().getUniqueId();
-                loadPlayerData(uuid);
-
-                PendingResultManager pending = plugin.getPendingResultManager();
-                if (pending.has(uuid)) {
-                    PendingResult result = pending.get(uuid);
-
-                    plugin.getScheduler().runTask(() -> {
-                        OfflinePlayer winner = Bukkit.getOfflinePlayer(result.player());
-                        OfflinePlayer loser = Bukkit.getOfflinePlayer(result.loser());
-
-                        plugin.getEconomyManager()
-                                .getEconomyProvider(result.provider())
-                                .deposit(winner, result.amount());
-
-                        plugin.getStorageManager().updateOfflinePlayerWin(winner.getUniqueId(), result.amount(), result.beforeTax());
-                        plugin.getStorageManager().updateOfflinePlayerLoss(loser.getUniqueId(), result.beforeTax());
-
-                        double taxRate = plugin.getConfig().getDouble("settings.tax.rate");
-
-                        Messages.GAME_SUMMARY_WIN.send(event.getPlayer(),
-                                "{TAX_RATE}", String.valueOf(taxRate),
-                                "{TAX_DEDUCTION}", TextUtil.numberFormat(result.taxedAmount()),
-                                "{WINNER}", winner.getName(),
-                                "{LOSER}", loser.getName(),
-                                "{CURRENCY}", plugin.getEconomyManager().getEconomyProvider(result.provider()).getDisplayName(),
-                                "{WINNINGS}", TextUtil.numberFormat(result.amount()));
-
-                        if (uuid.equals(result.loser())) {
-                            Messages.GAME_SUMMARY_LOSS.send(event.getPlayer(),
-                                    "{TAX_RATE}", String.valueOf(taxRate),
-                                    "{TAX_DEDUCTION}", TextUtil.numberFormat(result.taxedAmount()),
-                                    "{WINNER}", winner.getName(),
-                                    "{LOSER}", loser.getName(),
-                                    "{CURRENCY}", plugin.getEconomyManager().getEconomyProvider(result.provider()).getDisplayName(),
-                                    "{WINNINGS}", TextUtil.numberFormat(result.amount()));
-                        }
-
-                        pending.clear(uuid);
-                    });
-                }
-            }
+        Stream.of(
+                new Listener() {
+                    @EventHandler(priority = EventPriority.MONITOR)
+                    public void onPlayerJoin(final PlayerJoinEvent event) {
+                        loadPlayerData(event.getPlayer().getUniqueId());
+                    }
 
             }, new Listener() {
                 @EventHandler(priority = EventPriority.MONITOR)
                 public void onPlayerQuit(final PlayerQuitEvent event) {
-                    getPlayer(event.getPlayer().getUniqueId()).ifPresent(data -> savePlayerData(data, true));
+                    UUID quitterId = event.getPlayer().getUniqueId();
+
+                    getPlayer(quitterId).ifPresent(data -> savePlayerData(data, true));
+
+                    GameManager gameManager = plugin.getGameManager();
+                    CoinflipGame quitterGame = gameManager.getCoinflipGames().get(quitterId);
+                    if (quitterGame != null) {
+                        refundBothAndCancel(quitterGame);
+                        return;
+                    }
+
+                    for (CoinflipGame g : gameManager.getCoinflipGames().values()) {
+                        if (!g.getPlayerUUID().equals(quitterId) &&
+                            g.getOfflinePlayer().getUniqueId().equals(quitterId)) {
+                            refundBothAndCancel(g);
+                            break;
+                        }
+                    }
                 }
             }
         ).forEach(listener -> plugin.getServer().getPluginManager().registerEvents(listener, plugin));
@@ -172,5 +150,51 @@ public class StorageManager {
 
     public StorageHandler getStorageHandler() {
         return storageHandler;
+    }
+
+    private void refundBothAndCancel(CoinflipGame game) {
+
+        // Refund creator
+        plugin.getEconomyManager()
+                .getEconomyProvider(game.getProvider())
+                .deposit(game.getOfflinePlayer(), game.getAmount());
+
+        // Find opponent
+        OfflinePlayer opponent = null;
+        for (CoinflipGame g : plugin.getGameManager().getCoinflipGames().values()) {
+            if (!g.getPlayerUUID().equals(game.getPlayerUUID())) {
+                opponent = g.getOfflinePlayer();
+                break;
+            }
+        }
+
+        if (opponent != null) {
+            plugin.getEconomyManager()
+                    .getEconomyProvider(game.getProvider())
+                    .deposit(opponent, game.getAmount());
+        }
+
+        // Remove both games
+        plugin.getGameManager().removeCoinflipGame(game.getPlayerUUID());
+        if (opponent != null) {
+            plugin.getGameManager().removeCoinflipGame(opponent.getUniqueId());
+        }
+
+        // Notify players
+        if (game.getOfflinePlayer().isOnline()) {
+            Messages.GAME_REFUNDED.send(
+                    game.getOfflinePlayer().getPlayer(),
+                    "{AMOUNT}", game.getAmount(),
+                    "{PROVIDER}", game.getProvider()
+            );
+        }
+
+        if (opponent != null && opponent.isOnline()) {
+            Messages.GAME_REFUNDED.send(
+                    opponent.getPlayer(),
+                    "{AMOUNT}", game.getAmount(),
+                    "{PROVIDER}", game.getProvider()
+            );
+        }
     }
 }

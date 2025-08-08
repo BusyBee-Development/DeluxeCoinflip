@@ -20,9 +20,7 @@ import java.text.NumberFormat;
 import java.util.Locale;
 import java.util.UUID;
 
-public class PlayerChatListener implements Listener {
-
-    private final DeluxeCoinflipPlugin plugin;
+public record PlayerChatListener(DeluxeCoinflipPlugin plugin) implements Listener {
 
     public PlayerChatListener(DeluxeCoinflipPlugin plugin) {
         this.plugin = plugin;
@@ -73,7 +71,9 @@ public class PlayerChatListener implements Listener {
 
         event.setCancelled(true);
         plugin.getListenerCache().invalidate(uuid);
+
         game.setAmount(amount);
+
         plugin.getScheduler().runTask(() -> plugin.getInventoryManager().getGameBuilderGUI().openGameBuilderGUI(player, game));
     }
 }

@@ -1,3 +1,8 @@
+/*
+ * DeluxeCoinflip Plugin
+ * Copyright (c) 2021 - 2025 Zithium Studios. All rights reserved.
+ */
+
 package net.zithium.deluxecoinflip.game;
 
 import dev.triumphteam.gui.guis.Gui;
@@ -12,18 +17,12 @@ import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
-public class GameAnimationRunner {
-
-    private final DeluxeCoinflipPlugin plugin;
-
-    public GameAnimationRunner(DeluxeCoinflipPlugin plugin) {
-        this.plugin = plugin;
-    }
+public record GameAnimationRunner(DeluxeCoinflipPlugin plugin) {
 
     public void runAnimation(OfflinePlayer winner, OfflinePlayer loser, CoinflipGame game, Gui winnerGui, Gui loserGui) {
         final WrappedScheduler scheduler = plugin.getScheduler();
 
-        boolean isWinnerGamePlayer = winner.equals(game.getOfflinePlayer());
+        boolean isWinnerGamePlayer = winner.getUniqueId().equals(game.getPlayerUUID());
 
         ItemStack winnerItem = new ItemStackBuilder(
                 isWinnerGamePlayer ? game.getCachedHead() : new ItemStack(Material.PLAYER_HEAD))
@@ -48,7 +47,7 @@ public class GameAnimationRunner {
                 winnerGui.open(winnerPlayer);
                 plugin.getInventoryManager().getCoinflipGUI().startAnimation(
                     scheduler, winnerGui, winnerHead, loserHead,
-                    winner, loser, game, winnerPlayer, winnerPlayer.getLocation(), true);
+                    winner, loser, game, winnerPlayer, true);
             });
         }
 
@@ -57,7 +56,7 @@ public class GameAnimationRunner {
                 loserGui.open(loserPlayer);
                 plugin.getInventoryManager().getCoinflipGUI().startAnimation(
                     scheduler, loserGui, winnerHead, loserHead,
-                    winner, loser, game, loserPlayer, loserPlayer.getLocation(), false);
+                    winner, loser, game, loserPlayer, false);
             });
         }
     }

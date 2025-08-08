@@ -38,6 +38,7 @@ public class TextUtil {
         while(r.length() > MAX_LENGTH || r.matches("\\d+\\.[a-z]")){
             r = r.substring(0, r.length()-2) + r.substring(r.length() - 1);
         }
+
         return r;
     }
 

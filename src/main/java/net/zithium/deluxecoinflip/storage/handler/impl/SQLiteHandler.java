@@ -30,8 +30,6 @@ public class SQLiteHandler implements StorageHandler {
     private DeluxeCoinflipPlugin plugin;
     private File file;
 
-    private final String TABLE_NAME = "players";
-
     @Override
     public boolean onEnable(final DeluxeCoinflipPlugin plugin) {
         this.plugin = plugin;
@@ -44,6 +42,7 @@ public class SQLiteHandler implements StorageHandler {
                 return false;
             }
         }
+
         createTable();
         return true;
     }
@@ -74,6 +73,7 @@ public class SQLiteHandler implements StorageHandler {
     private synchronized void createTable() {
         try (Connection tableConnection = getConnection();
              Statement statement = tableConnection.createStatement()) {
+            String TABLE_NAME = "players";
             String createPlayersTable = "CREATE TABLE IF NOT EXISTS " + TABLE_NAME + " (" +
                     "uuid VARCHAR(255) NOT NULL PRIMARY KEY, " +
                     "wins INTEGER, " +
@@ -116,6 +116,7 @@ public class SQLiteHandler implements StorageHandler {
         } catch (SQLException e) {
             plugin.getLogger().log(Level.SEVERE, "Error occurred while attempting to get a player's data.", e);
         }
+
         return new PlayerData(uuid);
     }
 
@@ -179,13 +180,13 @@ public class SQLiteHandler implements StorageHandler {
         } catch (SQLException e) {
             plugin.getLogger().log(Level.SEVERE, "Error occurred while attempting to get all coinflip games.", e);
         }
+
         return games;
     }
 
     @Override
     public CoinflipGame getCoinflipGame(@NotNull UUID uuid) {
         final String SQL = "SELECT * FROM games WHERE uuid = ?";
-
         try (Connection GAME_CONNECTION = getConnection();
              PreparedStatement preparedStatement = GAME_CONNECTION.prepareStatement(SQL)) {
             preparedStatement.setString(1, uuid.toString());

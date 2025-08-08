@@ -15,34 +15,31 @@ import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.SkullMeta;
+import org.bukkit.persistence.PersistentDataType;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class ItemStackBuilder {
+public record ItemStackBuilder(ItemStack ITEM_STACK) {
     private static DeluxeCoinflipPlugin plugin;
 
     public static void setPlugin(DeluxeCoinflipPlugin pluginInstance) {
         plugin = pluginInstance;
     }
 
-    private final ItemStack ITEM_STACK;
-
-    public ItemStackBuilder(ItemStack item) {
-        this.ITEM_STACK = item;
-    }
-
     public ItemStackBuilder(Material material) {
-        this.ITEM_STACK = new ItemStack(material);
+        this(new ItemStack(material));
     }
 
     public static ItemStackBuilder getItemStack(ConfigurationSection section) {
         final Material material = Material.matchMaterial(section.getString("material", "null").toUpperCase());
 
         ItemStack item = null;
+
         if (material != null) {
             item = new ItemStack(material);
         }
+
         if (item == null) {
             return new ItemStackBuilder(Material.BARRIER).withName("&cInvalid material");
         }
@@ -134,6 +131,7 @@ public class ItemStackBuilder {
             skullMeta.setOwningPlayer(owner);
             ITEM_STACK.setItemMeta(skullMeta);
         }
+
         return this;
     }
 
@@ -148,6 +146,7 @@ public class ItemStackBuilder {
         for (String s : lore) {
             coloredLore.add(ColorUtil.color(s));
         }
+
         meta.setLore(coloredLore);
         ITEM_STACK.setItemMeta(meta);
         return this;
@@ -166,11 +165,13 @@ public class ItemStackBuilder {
             var meta = ITEM_STACK.getItemMeta();
             meta.getPersistentDataContainer().set(
                     plugin.getKey("dcf.dupeprotection"),
-                    org.bukkit.persistence.PersistentDataType.BYTE,
+                    PersistentDataType.BYTE,
                     (byte) 1
             );
+
             ITEM_STACK.setItemMeta(meta);
         }
+
         return ITEM_STACK;
     }
 }

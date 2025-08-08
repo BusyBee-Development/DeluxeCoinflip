@@ -16,14 +16,12 @@ import net.zithium.deluxecoinflip.config.Messages;
 import net.zithium.deluxecoinflip.economy.EconomyManager;
 import net.zithium.deluxecoinflip.game.CoinflipGame;
 import net.zithium.deluxecoinflip.game.GameAnimationRunner;
-import net.zithium.deluxecoinflip.storage.PendingResult;
 import net.zithium.deluxecoinflip.storage.PlayerData;
 import net.zithium.deluxecoinflip.storage.StorageManager;
 import net.zithium.deluxecoinflip.utility.ItemStackBuilder;
 import net.zithium.deluxecoinflip.utility.TextUtil;
 import net.zithium.library.utils.ColorUtil;
 import org.bukkit.Bukkit;
-import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.Sound;
@@ -68,7 +66,9 @@ public class CoinflipGUI implements Listener {
 
     public void startGame(@NotNull Player creator, @NotNull OfflinePlayer opponent, CoinflipGame game) {
         // Send the challenge message BEFORE any swapping
-        Messages.PLAYER_CHALLENGE.send(opponent.getPlayer(), "{OPPONENT}", creator.getName());
+        if (opponent.isOnline()) {
+            Messages.PLAYER_CHALLENGE.send(opponent.getPlayer(), "{OPPONENT}", creator.getName());
+        }
 
         // SecureRandom for better randomness
         SecureRandom random = new SecureRandom();
@@ -84,7 +84,7 @@ public class CoinflipGUI implements Listener {
         OfflinePlayer winner = players.get(random.nextInt(players.size()));
         OfflinePlayer loser = (winner == creator) ? opponent : creator;
 
-        // Mitigate concurrency issues with Folia
+        // Folia requires that both users have a unique GUI
         Gui winnerGui = createGameGui();
         Gui loserGui = createGameGui();
 
@@ -99,7 +99,7 @@ public class CoinflipGUI implements Listener {
 
     public void startAnimation(WrappedScheduler scheduler, Gui gui, GuiItem winnerHead, GuiItem loserHead,
                                OfflinePlayer winner, OfflinePlayer loser, CoinflipGame game,
-                               Player targetPlayer, Location regionLoc, boolean isWinnerThread) {
+                               Player targetPlayer, boolean isWinnerThread) {
 
         ConfigurationSection animationConfig1 = plugin.getConfig().getConfigurationSection("coinflip-gui.animation.1");
         ConfigurationSection animationConfig2 = plugin.getConfig().getConfigurationSection("coinflip-gui.animation.2");
@@ -146,60 +146,52 @@ public class CoinflipGUI implements Listener {
                     finalWinAmount -= taxed;
                 }
 
-                if (isWinnerThread) {
-                    long taxedPercentage = taxed;
-                    long providedWinAmount = finalWinAmount;
-                    if (!winner.isOnline()) {
-                        plugin.getPendingResultManager().save(winner.getUniqueId(), new PendingResult(
-                            winner.getUniqueId(), providedWinAmount, beforeTax, taxed, game.getProvider(), loser.getUniqueId()
-                        ));
+                if (!plugin.getGameManager().getCoinflipGames().containsKey(game.getPlayerUUID())) {
+                    return;
+                }
 
-                        plugin.getGameManager().removeCoinflipGame(game.getPlayerUUID());
-                        return;
-                    }
+                if (isWinnerThread) {
+                    long providedWinAmount = finalWinAmount;
 
                     scheduler.runTask(() -> {
                         economyManager.getEconomyProvider(game.getProvider()).deposit(winner, providedWinAmount);
                         Bukkit.getPluginManager().callEvent(new CoinflipCompletedEvent(winner, loser, providedWinAmount));
                         plugin.getGameManager().removeCoinflipGame(game.getPlayerUUID());
-
-                        // Update player stats
-                        StorageManager storageManager = plugin.getStorageManager();
-                        updatePlayerStats(storageManager, winner, providedWinAmount, beforeTax, true);
-                        updatePlayerStats(storageManager, loser, 0, beforeTax, false);
-
-                        // Send messages
-                        String winAmountFormatted = TextUtil.numberFormat(providedWinAmount);
-                        String taxedFormatted = TextUtil.numberFormat(taxedPercentage);
-
-                        if (winner.isOnline()) {
-                            Messages.GAME_SUMMARY_WIN.send(winner.getPlayer(), replacePlaceholders(
-                                    String.valueOf(taxRate), taxedFormatted, winner.getName(), loser.getName(),
-                                    economyManager.getEconomyProvider(game.getProvider()).getDisplayName(), winAmountFormatted
-                            ));
-                        }
-
-                        if (loser.isOnline()) {
-                            Messages.GAME_SUMMARY_LOSS.send(loser.getPlayer(), replacePlaceholders(
-                                    String.valueOf(taxRate), taxedFormatted, winner.getName(), loser.getName(),
-                                    economyManager.getEconomyProvider(game.getProvider()).getDisplayName(), winAmountFormatted
-                            ));
-                        }
-
-                        // Broadcast results
-                        broadcastWinningMessage(providedWinAmount, taxedPercentage, winner.getName(), loser.getName(),
-                                economyManager.getEconomyProvider(game.getProvider()).getDisplayName());
-
-                        // Discord hook
-                        if (config.getBoolean("discord.webhook.enabled", false) || config.getBoolean("discord.bot.enabled", false)) {
-                            plugin.getDiscordHook().executeWebhook(winner, loser,
-                                    economyManager.getEconomyProvider(game.getProvider()).getDisplayName(), winAmount).exceptionally(throwable -> {
-                                plugin.getLogger().severe("An error occurred when triggering the webhook.");
-                                throwable.printStackTrace();
-                                return null;
-                            });
-                        }
                     });
+
+                    // Update player stats
+                    StorageManager storageManager = plugin.getStorageManager();
+                    updatePlayerStats(storageManager, winner, finalWinAmount, beforeTax, true);
+                    updatePlayerStats(storageManager, loser, 0, beforeTax, false);
+
+                    // Send messages
+                    String winAmountFormatted = TextUtil.numberFormat(finalWinAmount);
+                    String taxedFormatted = TextUtil.numberFormat(taxed);
+
+                    if (winner.isOnline()) {
+                        Messages.GAME_SUMMARY_WIN.send(winner.getPlayer(), replacePlaceholders(
+                                String.valueOf(taxRate), taxedFormatted, winner.getName(), loser.getName(),
+                                economyManager.getEconomyProvider(game.getProvider()).getDisplayName(), winAmountFormatted
+                        ));
+                    }
+
+                    if (loser.isOnline()) {
+                        Messages.GAME_SUMMARY_LOSS.send(loser.getPlayer(), replacePlaceholders(
+                                String.valueOf(taxRate), taxedFormatted, winner.getName(), loser.getName(),
+                                economyManager.getEconomyProvider(game.getProvider()).getDisplayName(), winAmountFormatted
+                        ));
+                    }
+
+                    // Broadcast results
+                    broadcastWinningMessage(finalWinAmount, taxed, winner.getName(), loser.getName(), economyManager.getEconomyProvider(game.getProvider()).getDisplayName());
+
+                    if (config.getBoolean("discord.webhook.enabled", false) || config.getBoolean("discord.bot.enabled", false)) {
+                        plugin.getDiscordHook().executeWebhook(winner, loser, economyManager.getEconomyProvider(game.getProvider()).getDisplayName(), winAmount).exceptionally(throwable -> {
+                            plugin.getLogger().severe("An error occurred when triggering the webhook.");
+                            throwable.printStackTrace();
+                            return null;
+                        });
+                    }
                 }
 
                 return;
@@ -223,10 +215,10 @@ public class CoinflipGUI implements Listener {
                 }
             }
 
-            scheduler.runTaskLaterAtLocation(regionLoc, task[0], 10L);
+            scheduler.runTaskLaterAtEntity(targetPlayer, task[0], 10L);
         };
 
-        scheduler.runTaskAtLocation(regionLoc, task[0]);
+        scheduler.runTaskAtEntity(targetPlayer, task[0]);
     }
 
     private void updatePlayerStats(StorageManager storageManager, OfflinePlayer player, long winAmount, long beforeTax, boolean isWinner) {

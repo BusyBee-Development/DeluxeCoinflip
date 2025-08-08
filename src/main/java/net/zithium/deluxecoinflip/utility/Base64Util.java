@@ -15,9 +15,9 @@ import org.bukkit.profile.PlayerTextures;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.Base64;
-import java.util.UUID;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 public class Base64Util {
 
@@ -26,7 +26,10 @@ public class Base64Util {
     private static final UUID RANDOM_UUID = UUID.fromString("92864445-51c5-4c3b-9039-517c9927d1b4");
 
     public static ItemStack getBaseHead(String data) {
-        if (cache.containsKey(data)) return cache.get(data);
+        if (cache.containsKey(data)) {
+            return cache.get(data);
+        }
+
         ItemStack head = new ItemStack(Material.PLAYER_HEAD);
         final SkullMeta meta = (SkullMeta) head.getItemMeta();
         setBase64ToSkullMeta(data, meta);
@@ -44,6 +47,7 @@ public class Base64Util {
         } catch (MalformedURLException exception) {
             throw new RuntimeException("Invalid URL", exception);
         }
+
         textures.setSkin(urlObject); // Set the skin of the player profile to the URL
         profile.setTextures(textures); // Set the textures back to the profile
         return profile;

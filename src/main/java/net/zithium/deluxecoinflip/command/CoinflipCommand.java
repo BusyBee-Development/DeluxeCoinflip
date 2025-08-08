@@ -219,6 +219,7 @@ public class CoinflipCommand extends BaseCommand {
         for (EconomyProvider provider : economyManager.getEconomyProviders().values()) {
             if (name.equalsIgnoreCase(provider.getDisplayName())) return provider;
         }
+
         return null;
     }
 }

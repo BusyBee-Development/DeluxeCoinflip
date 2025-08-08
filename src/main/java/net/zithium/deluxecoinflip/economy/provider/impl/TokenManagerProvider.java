@@ -5,8 +5,8 @@
 
 package net.zithium.deluxecoinflip.economy.provider.impl;
 
-import net.zithium.deluxecoinflip.economy.provider.EconomyProvider;
 import me.realized.tokenmanager.api.TokenManager;
+import net.zithium.deluxecoinflip.economy.provider.EconomyProvider;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 

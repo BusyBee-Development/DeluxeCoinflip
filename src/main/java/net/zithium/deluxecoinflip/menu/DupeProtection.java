@@ -20,16 +20,14 @@ import org.bukkit.persistence.PersistentDataType;
 
 import java.util.concurrent.CompletableFuture;
 
-public class DupeProtection implements Listener {
-
-    private final DeluxeCoinflipPlugin plugin;
+public record DupeProtection(DeluxeCoinflipPlugin plugin) implements Listener {
 
     public DupeProtection(DeluxeCoinflipPlugin plugin) {
         this.plugin = plugin;
         Bukkit.getPluginManager().registerEvents(this, plugin);
     }
 
-    private void cleanPlayerInventoryAsync(Player player) {
+    private void cleanPlayerInventory(Player player) {
         if (!player.isOnline()) return;
 
         // Run async to minimize impact on the main thread
@@ -69,7 +67,8 @@ public class DupeProtection implements Listener {
         if (isProtected(droppedItem)) {
             event.setCancelled(true);
         }
-        cleanPlayerInventoryAsync(event.getPlayer());
+
+        cleanPlayerInventory(event.getPlayer());
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
@@ -79,18 +78,19 @@ public class DupeProtection implements Listener {
         if (isProtected(interactedItem)) {
             event.setCancelled(true);
         }
-        cleanPlayerInventoryAsync(event.getPlayer());
+
+        cleanPlayerInventory(event.getPlayer());
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onCommand(PlayerCommandPreprocessEvent event) {
-        cleanPlayerInventoryAsync(event.getPlayer());
+        cleanPlayerInventory(event.getPlayer());
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onOpen(InventoryOpenEvent event) {
         if (event.getPlayer() instanceof Player player) {
-            cleanPlayerInventoryAsync(player);
+            cleanPlayerInventory(player);
         }
     }
 }

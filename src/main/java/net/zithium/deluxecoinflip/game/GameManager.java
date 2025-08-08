@@ -7,7 +7,6 @@ package net.zithium.deluxecoinflip.game;
 
 import net.zithium.deluxecoinflip.DeluxeCoinflipPlugin;
 import net.zithium.deluxecoinflip.storage.StorageManager;
-import org.bukkit.Bukkit;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -35,11 +34,7 @@ public class GameManager {
      */
     public void addCoinflipGame(UUID uuid, CoinflipGame game) {
         coinflipGames.put(uuid, game);
-        if (Bukkit.isPrimaryThread()) {
-            plugin.getScheduler().runTaskAsynchronously(() -> storageManager.getStorageHandler().saveCoinflip(game));
-        } else {
-            storageManager.getStorageHandler().saveCoinflip(game);
-        }
+        plugin.getScheduler().runTaskAsynchronously(() -> storageManager.getStorageHandler().saveCoinflip(game));
     }
 
     /**
@@ -49,11 +44,7 @@ public class GameManager {
      */
     public void removeCoinflipGame(UUID uuid) {
         coinflipGames.remove(uuid);
-        if (Bukkit.isPrimaryThread()) {
-            plugin.getScheduler().runTaskAsynchronously(() -> storageManager.getStorageHandler().deleteCoinfip(uuid));
-        } else {
-            storageManager.getStorageHandler().deleteCoinfip(uuid);
-        }
+        plugin.getScheduler().runTaskAsynchronously(() -> storageManager.getStorageHandler().deleteCoinfip(uuid));
     }
 
     /**

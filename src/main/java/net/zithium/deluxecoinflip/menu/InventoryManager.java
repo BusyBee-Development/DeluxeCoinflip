@@ -45,6 +45,7 @@ public class InventoryManager {
                 PersistentDataType.BYTE,
                 (byte) 1
         );
+
         item.setItemMeta(meta);
         return item;
     }

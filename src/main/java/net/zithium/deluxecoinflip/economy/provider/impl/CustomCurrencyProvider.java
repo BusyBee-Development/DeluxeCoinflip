@@ -5,12 +5,12 @@
 
 package net.zithium.deluxecoinflip.economy.provider.impl;
 
+import me.clip.placeholderapi.PlaceholderAPI;
 import net.zithium.deluxecoinflip.DeluxeCoinflipPlugin;
 import net.zithium.deluxecoinflip.economy.provider.EconomyProvider;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.command.ConsoleCommandSender;
-import me.clip.placeholderapi.PlaceholderAPI;
 
 public class CustomCurrencyProvider extends EconomyProvider {
 

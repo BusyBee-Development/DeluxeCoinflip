@@ -5,10 +5,10 @@
 
 package net.zithium.deluxecoinflip.hook;
 
+import me.clip.placeholderapi.expansion.PlaceholderExpansion;
 import net.zithium.deluxecoinflip.DeluxeCoinflipPlugin;
 import net.zithium.deluxecoinflip.storage.PlayerData;
 import net.zithium.deluxecoinflip.storage.StorageManager;
-import me.clip.placeholderapi.expansion.PlaceholderExpansion;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
@@ -34,21 +34,18 @@ public class PlaceholderAPIHook extends PlaceholderExpansion {
         return true;
     }
 
-    @NotNull
     @Override
-    public String getAuthor() {
+    public @NotNull String getAuthor() {
         return plugin.getDescription().getAuthors().toString();
     }
 
-    @NotNull
     @Override
-    public String getIdentifier() {
+    public @NotNull String getIdentifier() {
         return "deluxecoinflip";
     }
 
-    @NotNull
     @Override
-    public String getVersion() {
+    public @NotNull String getVersion() {
         return plugin.getDescription().getVersion();
     }
 

@@ -5,6 +5,8 @@
 
 package net.zithium.deluxecoinflip.menu.inventories;
 
+import dev.triumphteam.gui.guis.Gui;
+import dev.triumphteam.gui.guis.GuiItem;
 import net.kyori.adventure.text.Component;
 import net.zithium.deluxecoinflip.DeluxeCoinflipPlugin;
 import net.zithium.deluxecoinflip.api.events.CoinflipCreatedEvent;
@@ -15,8 +17,6 @@ import net.zithium.deluxecoinflip.economy.provider.EconomyProvider;
 import net.zithium.deluxecoinflip.game.CoinflipGame;
 import net.zithium.deluxecoinflip.utility.ItemStackBuilder;
 import net.zithium.deluxecoinflip.utility.TextUtil;
-import dev.triumphteam.gui.guis.Gui;
-import dev.triumphteam.gui.guis.GuiItem;
 import net.zithium.library.utils.ColorUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.Sound;
@@ -82,7 +82,9 @@ public class GameBuilderGUI {
 
     private void setupCurrencySelector(Gui gui, Player player, CoinflipGame game) {
         ConfigurationSection section = config.getConfigurationSection("gamebuilder-gui.currency-select");
-        if (section == null || !section.getBoolean("enabled", true)) return;
+        if (section == null || !section.getBoolean("enabled", true)) {
+            return;
+        }
 
         int slot = section.getInt("slot");
         ItemStack item = ItemStackBuilder.getItemStack(section)
@@ -105,7 +107,9 @@ public class GameBuilderGUI {
 
     private void setupAmountItems(Gui gui, Player player, CoinflipGame game) {
         ConfigurationSection section = config.getConfigurationSection("gamebuilder-gui.amount-items");
-        if (section == null) return;
+        if (section == null) {
+            return;
+        }
 
         for (String key : section.getKeys(false)) {
             ConfigurationSection itemSection = section.getConfigurationSection(key);
@@ -145,7 +149,9 @@ public class GameBuilderGUI {
 
     private void setupCustomAmount(Gui gui, Player player, CoinflipGame game) {
         ConfigurationSection section = config.getConfigurationSection("gamebuilder-gui.custom-amount");
-        if (section == null) return;
+        if (section == null) {
+            return;
+        }
 
         GuiItem item = new GuiItem(
                 ItemStackBuilder.getItemStack(section).build(),
@@ -162,7 +168,9 @@ public class GameBuilderGUI {
 
     private void setupCreateGame(Gui gui, Player player, CoinflipGame game) {
         ConfigurationSection section = config.getConfigurationSection("gamebuilder-gui.create-game");
-        if (section == null) return;
+        if (section == null) {
+            return;
+        }
 
         GuiItem item = new GuiItem(ItemStackBuilder.getItemStack(section).build(), event -> {
             EconomyProvider provider = economyManager.getEconomyProvider(game.getProvider());

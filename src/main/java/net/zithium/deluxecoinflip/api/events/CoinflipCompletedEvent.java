@@ -36,9 +36,8 @@ public class CoinflipCompletedEvent extends Event {
         return winnings;
     }
 
-    @NotNull
     @Override
-    public HandlerList getHandlers() {
+    public @NotNull HandlerList getHandlers() {
         return HANDLERS_LIST;
     }
 
