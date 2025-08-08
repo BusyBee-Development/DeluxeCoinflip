@@ -22,6 +22,8 @@ public class CoinflipGame {
     private long amount;
     private ItemStack cachedHead;
 
+    private volatile boolean cancelled = false;
+
     public CoinflipGame(UUID uuid, String provider, long amount) {
         this.uuid = uuid;
         this.provider = provider;
@@ -46,13 +48,20 @@ public class CoinflipGame {
         return uuid;
     }
 
+    public boolean isCancelled() {
+        return cancelled;
+    }
+
+    public void cancel() {
+        this.cancelled = true;
+    }
+
     public long getAmount() {
         return amount;
     }
 
     public void setAmount(long amount) {
-        this.amount = amount;
-        if (this.amount < 0) this.amount = 0;
+        this.amount = Math.max(amount, 0);
     }
 
     public OfflinePlayer getOfflinePlayer() {

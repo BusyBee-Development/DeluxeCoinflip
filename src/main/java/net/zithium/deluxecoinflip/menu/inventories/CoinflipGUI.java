@@ -126,6 +126,18 @@ public class CoinflipGUI implements Listener {
 
         Runnable[] task = new Runnable[1];
         task[0] = () -> {
+            if (game.isCancelled()) {
+                if (targetPlayer.isOnline()) {
+                    scheduler.runTaskAtEntity(targetPlayer, targetPlayer::closeInventory);
+                }
+
+                return;
+            }
+
+            if (!targetPlayer.isOnline()) {
+                return;
+            }
+
             if (state.count++ >= ANIMATION_COUNT_THRESHOLD) {
                 // Final state
                 gui.setItem(13, winnerHead);
@@ -149,7 +161,11 @@ public class CoinflipGUI implements Listener {
                     finalWinAmount -= taxed;
                 }
 
-                if (!plugin.getGameManager().getCoinflipGames().containsKey(game.getPlayerUUID())) {
+                if (game.isCancelled() || !plugin.getGameManager().getCoinflipGames().containsKey(game.getPlayerUUID())) {
+                    if (targetPlayer.isOnline()) {
+                        scheduler.runTaskAtEntity(targetPlayer, targetPlayer::closeInventory);
+                    }
+
                     return;
                 }
 
@@ -185,15 +201,17 @@ public class CoinflipGUI implements Listener {
                         ));
                     }
 
-                    // Broadcast results
-                    broadcastWinningMessage(finalWinAmount, taxed, winner.getName(), loser.getName(), economyManager.getEconomyProvider(game.getProvider()).getDisplayName());
+                    broadcastWinningMessage(finalWinAmount, taxed, winner.getName(), loser.getName(),
+                            economyManager.getEconomyProvider(game.getProvider()).getDisplayName());
 
                     if (config.getBoolean("discord.webhook.enabled", false) || config.getBoolean("discord.bot.enabled", false)) {
-                        plugin.getDiscordHook().executeWebhook(winner, loser, economyManager.getEconomyProvider(game.getProvider()).getDisplayName(), winAmount).exceptionally(throwable -> {
-                            plugin.getLogger().severe("An error occurred when triggering the webhook.");
-                            throwable.printStackTrace();
-                            return null;
-                        });
+                        plugin.getDiscordHook().executeWebhook(winner, loser,
+                                economyManager.getEconomyProvider(game.getProvider()).getDisplayName(), winAmount)
+                                .exceptionally(throwable -> {
+                                    plugin.getLogger().severe("An error occurred when triggering the webhook.");
+                                    throwable.printStackTrace();
+                                    return null;
+                                });
                     }
                 }
 
@@ -202,7 +220,6 @@ public class CoinflipGUI implements Listener {
 
             // Animation swapping
             gui.setItem(13, state.alternate ? winnerHead : loserHead);
-
             GuiItem filler = new GuiItem(state.alternate ? firstAnimationItem.clone() : secondAnimationItem.clone());
 
             for (int i = 0; i < gui.getInventory().getSize(); i++) {
@@ -266,11 +283,13 @@ public class CoinflipGUI implements Listener {
     }
 
     private Object[] replacePlaceholders(String taxRate, String taxDeduction, String winner, String loser, String currency, String winnings) {
-        return new Object[]{"{TAX_RATE}", taxRate,
+        return new Object[] {
+                "{TAX_RATE}", taxRate,
                 "{TAX_DEDUCTION}", taxDeduction,
                 "{WINNER}", winner,
                 "{LOSER}", loser,
                 "{CURRENCY}", currency,
-                "{WINNINGS}", winnings};
+                "{WINNINGS}", winnings
+        };
     }
 }

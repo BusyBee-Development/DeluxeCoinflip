@@ -7,27 +7,28 @@ package net.zithium.deluxecoinflip.game;
 
 import net.zithium.deluxecoinflip.DeluxeCoinflipPlugin;
 import net.zithium.deluxecoinflip.storage.StorageManager;
-import org.bukkit.Bukkit;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 public class GameManager {
 
     private final DeluxeCoinflipPlugin plugin;
-    private final Map<UUID, CoinflipGame> coinflipGames;
+    private final ConcurrentMap<UUID, CoinflipGame> coinflipGames;
     private final StorageManager storageManager;
-    private final Map<UUID, UUID> pairings;
+    private final ConcurrentMap<UUID, UUID> pairings;
 
     private boolean canStartGame = false;
 
     public GameManager(DeluxeCoinflipPlugin plugin) {
         this.plugin = plugin;
-        this.coinflipGames = new HashMap<>();
+        this.coinflipGames = new ConcurrentHashMap<>();
         this.storageManager = plugin.getStorageManager();
-        this.pairings = new HashMap<>();
+        this.pairings = new ConcurrentHashMap<>();
     }
 
     /**
@@ -59,6 +60,25 @@ public class GameManager {
      */
     public void registerPair(UUID creator, UUID opponent) {
         pairings.put(creator, opponent);
+    }
+
+    /**
+     * Resolve the owner (creator) UUID for any participant in a running game.
+     * If the participant is the owner, returns that UUID.
+     * If the participant is the opponent, returns the creator's UUID.
+     */
+    public Optional<UUID> getOwnerFor(UUID participant) {
+        if (pairings.containsKey(participant)) {
+            return Optional.of(participant);
+        }
+
+        for (Map.Entry<UUID, UUID> e : pairings.entrySet()) {
+            if (participant.equals(e.getValue())) {
+                return Optional.of(e.getKey());
+            }
+        }
+
+        return Optional.empty();
     }
 
     /**

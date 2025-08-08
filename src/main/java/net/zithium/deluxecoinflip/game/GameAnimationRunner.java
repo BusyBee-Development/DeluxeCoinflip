@@ -16,6 +16,7 @@ import org.bukkit.Material;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
+import java.util.UUID;
 
 public record GameAnimationRunner(DeluxeCoinflipPlugin plugin) {
 
@@ -59,5 +60,9 @@ public record GameAnimationRunner(DeluxeCoinflipPlugin plugin) {
                     winner, loser, game, loserPlayer, false);
             });
         }
+
+        UUID creator = game.getPlayerUUID();
+        UUID other = isWinnerGamePlayer ? loser.getUniqueId() : winner.getUniqueId();
+        plugin.getGameManager().registerPair(creator, other);
     }
 }
