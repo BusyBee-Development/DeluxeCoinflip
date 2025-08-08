@@ -50,7 +50,7 @@ public final class ActiveGamesCache {
     }
 
     public java.util.Collection<CoinflipGame> getAllUniqueGames() {
-        return new java.util.LinkedHashSet<CoinflipGame>(this.activeGames.values());
+        return new java.util.LinkedHashSet<>(this.activeGames.values());
     }
 
     public void clear() {

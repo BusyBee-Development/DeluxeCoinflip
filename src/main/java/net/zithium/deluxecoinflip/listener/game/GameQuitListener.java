@@ -17,9 +17,7 @@ import org.jetbrains.annotations.NotNull;
 import java.text.NumberFormat;
 import java.util.Locale;
 
-public final class GameQuitListener implements Listener {
-
-    private final DeluxeCoinflipPlugin plugin;
+public record GameQuitListener(DeluxeCoinflipPlugin plugin) implements Listener {
 
     public GameQuitListener(@NotNull DeluxeCoinflipPlugin plugin) {
         this.plugin = plugin;

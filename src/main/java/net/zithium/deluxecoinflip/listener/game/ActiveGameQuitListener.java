@@ -17,7 +17,11 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import org.jetbrains.annotations.NotNull;
 
 import java.text.NumberFormat;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.UUID;
 
 public final class ActiveGameQuitListener implements Listener {
     private final DeluxeCoinflipPlugin plugin;
