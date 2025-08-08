@@ -7,9 +7,11 @@ package net.zithium.deluxecoinflip.game;
 
 import net.zithium.deluxecoinflip.DeluxeCoinflipPlugin;
 import net.zithium.deluxecoinflip.storage.StorageManager;
+import org.bukkit.Bukkit;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 public class GameManager {
@@ -17,6 +19,7 @@ public class GameManager {
     private final DeluxeCoinflipPlugin plugin;
     private final Map<UUID, CoinflipGame> coinflipGames;
     private final StorageManager storageManager;
+    private final Map<UUID, UUID> pairings;
 
     private boolean canStartGame = false;
 
@@ -24,6 +27,7 @@ public class GameManager {
         this.plugin = plugin;
         this.coinflipGames = new HashMap<>();
         this.storageManager = plugin.getStorageManager();
+        this.pairings = new HashMap<>();
     }
 
     /**
@@ -45,6 +49,59 @@ public class GameManager {
     public void removeCoinflipGame(UUID uuid) {
         coinflipGames.remove(uuid);
         plugin.getScheduler().runTaskAsynchronously(() -> storageManager.getStorageHandler().deleteCoinfip(uuid));
+    }
+
+    /**
+     * Register a creator/opponent pair when a game actually starts.
+     *
+     * @param creator  The UUID of the game owner (creator)
+     * @param opponent The UUID of the opponent
+     */
+    public void registerPair(UUID creator, UUID opponent) {
+        pairings.put(creator, opponent);
+    }
+
+    /**
+     * Get the opponent of a participant (works whether participant is creator or opponent).
+     *
+     * @param participant The participant's UUID
+     * @return Optional opponent UUID
+     */
+    public Optional<UUID> getOpponent(UUID participant) {
+        if (pairings.containsKey(participant)) {
+            return Optional.ofNullable(pairings.get(participant));
+        }
+
+        for (Map.Entry<UUID, UUID> entry : pairings.entrySet()) {
+            if (participant.equals(entry.getValue())) {
+                return Optional.of(entry.getKey());
+            }
+        }
+
+        return Optional.empty();
+    }
+
+    /**
+     * Remove a pairing by either participant.
+     *
+     * @param participant The participant's UUID (creator or opponent)
+     */
+    public void removePairByAny(UUID participant) {
+        if (pairings.remove(participant) != null) {
+            return;
+        }
+
+        UUID toRemove = null;
+        for (Map.Entry<UUID, UUID> entry : pairings.entrySet()) {
+            if (participant.equals(entry.getValue())) {
+                toRemove = entry.getKey();
+                break;
+            }
+        }
+
+        if (toRemove != null) {
+            pairings.remove(toRemove);
+        }
     }
 
     /**

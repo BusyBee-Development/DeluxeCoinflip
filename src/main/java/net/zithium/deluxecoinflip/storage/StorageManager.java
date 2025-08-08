@@ -20,7 +20,9 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 
+import java.text.NumberFormat;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -64,22 +66,28 @@ public class StorageManager {
                         getPlayer(quitterId).ifPresent(data -> savePlayerData(data, true));
 
                         GameManager gameManager = plugin.getGameManager();
-                        CoinflipGame quitterGame = gameManager.getCoinflipGames().get(quitterId);
-                        if (quitterGame != null) {
-                            refundBothAndCancel(quitterGame);
+
+                        Optional<UUID> opponentOpt = gameManager.getOpponent(quitterId);
+                        if (opponentOpt.isEmpty()) {
+                            return;
+                        }
+                        UUID opponentId = opponentOpt.get();
+
+                        UUID ownerId = gameManager.getCoinflipGames().containsKey(quitterId) ? quitterId
+                                : (gameManager.getCoinflipGames().containsKey(opponentId) ? opponentId : null);
+                        if (ownerId == null) {
                             return;
                         }
 
-                        for (CoinflipGame g : gameManager.getCoinflipGames().values()) {
-                            if (!g.getPlayerUUID().equals(quitterId) &&
-                                g.getOfflinePlayer().getUniqueId().equals(quitterId)) {
-                                refundBothAndCancel(g);
-                                break;
-                            }
+                        CoinflipGame ownerGame = gameManager.getCoinflipGames().get(ownerId);
+                        if (ownerGame == null) {
+                            return;
                         }
+
+                        refundBothAndCancel(ownerGame, opponentId);
                     }
                 }
-            ).forEach(listener -> plugin.getServer().getPluginManager().registerEvents(listener, plugin));
+        ).forEach(listener -> plugin.getServer().getPluginManager().registerEvents(listener, plugin));
 
         Bukkit.getOnlinePlayers().forEach(player -> loadPlayerData(player.getUniqueId()));
     }
@@ -124,8 +132,9 @@ public class StorageManager {
                             .deposit(player, game.getAmount());
 
                     if (player.isOnline()) {
+                        String formatted = NumberFormat.getNumberInstance(Locale.US).format(game.getAmount());
                         Messages.GAME_REFUNDED.send(player.getPlayer(),
-                                "{AMOUNT}", game.getAmount(),
+                                "{AMOUNT}", formatted,
                                 "{PROVIDER}", game.getProvider());
                     }
 
@@ -152,47 +161,37 @@ public class StorageManager {
         return storageHandler;
     }
 
-    private void refundBothAndCancel(CoinflipGame game) {
+    private void refundBothAndCancel(CoinflipGame game, UUID opponentId) {
 
         // Refund creator
         plugin.getEconomyManager()
                 .getEconomyProvider(game.getProvider())
                 .deposit(game.getOfflinePlayer(), game.getAmount());
 
-        // Find opponent
-        OfflinePlayer opponent = null;
-        for (CoinflipGame g : plugin.getGameManager().getCoinflipGames().values()) {
-            if (!g.getPlayerUUID().equals(game.getPlayerUUID())) {
-                opponent = g.getOfflinePlayer();
-                break;
-            }
-        }
+        // Refund opponent
+        OfflinePlayer opponent = Bukkit.getOfflinePlayer(opponentId);
+        plugin.getEconomyManager()
+                .getEconomyProvider(game.getProvider())
+                .deposit(opponent, game.getAmount());
 
-        if (opponent != null) {
-            plugin.getEconomyManager()
-                    .getEconomyProvider(game.getProvider())
-                    .deposit(opponent, game.getAmount());
-        }
-
-        // Remove both games
+        // Remove both games and pairing
         plugin.getGameManager().removeCoinflipGame(game.getPlayerUUID());
-        if (opponent != null) {
-            plugin.getGameManager().removeCoinflipGame(opponent.getUniqueId());
-        }
+        plugin.getGameManager().removeCoinflipGame(opponentId);
+        plugin.getGameManager().removePairByAny(game.getPlayerUUID());
+
+        String formatted = NumberFormat.getNumberInstance(Locale.US).format(game.getAmount());
 
         // Notify players
         if (game.getOfflinePlayer().isOnline()) {
-            Messages.GAME_REFUNDED.send(
-                    game.getOfflinePlayer().getPlayer(),
-                    "{AMOUNT}", game.getAmount(),
+            Messages.GAME_REFUNDED.send(game.getOfflinePlayer().getPlayer(),
+                    "{AMOUNT}", formatted,
                     "{PROVIDER}", game.getProvider()
             );
         }
 
-        if (opponent != null && opponent.isOnline()) {
-            Messages.GAME_REFUNDED.send(
-                    opponent.getPlayer(),
-                    "{AMOUNT}", game.getAmount(),
+        if (opponent.isOnline()) {
+            Messages.GAME_REFUNDED.send(opponent.getPlayer(),
+                    "{AMOUNT}", formatted,
                     "{PROVIDER}", game.getProvider()
             );
         }

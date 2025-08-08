@@ -81,6 +81,9 @@ public class CoinflipGUI implements Listener {
         creator = players.get(0).getPlayer();
         opponent = players.get(1);
 
+        // Register "pair" to ensure removal order is adequate
+        plugin.getGameManager().registerPair(game.getPlayerUUID(), opponent.getUniqueId());
+
         OfflinePlayer winner = players.get(random.nextInt(players.size()));
         OfflinePlayer loser = (winner == creator) ? opponent : creator;
 
