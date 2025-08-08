@@ -33,11 +33,7 @@ import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
 
 import java.security.SecureRandom;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 public class CoinflipGUI implements Listener {
 
@@ -64,18 +60,22 @@ public class CoinflipGUI implements Listener {
         this.minimumBroadcastWinnings = config.getLong("settings.minimum-broadcast-winnings");
     }
 
-    public void startGame(@NotNull Player creator, @NotNull OfflinePlayer opponent, CoinflipGame game) {
+    public void startGame(@NotNull Player creator, @NotNull Player opponent, CoinflipGame game) {
         // Send the challenge message BEFORE any swapping
         if (opponent.isOnline()) {
             Messages.PLAYER_CHALLENGE.send(opponent.getPlayer(), "{OPPONENT}", creator.getName());
         }
+
+        game.attachOpponent(opponent.getUniqueId());
+        game.setActiveGame(true);
+        DeluxeCoinflipPlugin.getInstance().getActiveGamesCache().register(game);
 
         // SecureRandom for better randomness
         SecureRandom random = new SecureRandom();
         random.setSeed(System.nanoTime() + creator.getUniqueId().hashCode() + opponent.getUniqueId().hashCode());
 
         // Randomly shuffle player order
-        List<OfflinePlayer> players = new ArrayList<>(Arrays.asList(creator, opponent));
+        List<Player> players = new ArrayList<>(Arrays.asList(creator, opponent));
         Collections.shuffle(players, random);
 
         creator = players.get(0).getPlayer();
@@ -118,13 +118,23 @@ public class CoinflipGUI implements Listener {
         }
 
         AnimationState state = new AnimationState();
+
         long winAmount = game.getAmount() * 2;
         long beforeTax = winAmount / 2;
 
         Runnable[] task = new Runnable[1];
         task[0] = () -> {
+            if (!game.isActiveGame()) {
+                scheduler.runTaskLaterAtEntity(targetPlayer, () -> {
+                    if (targetPlayer.isOnline()) {
+                        targetPlayer.closeInventory();
+                    }
+                }, 20L);
+
+                return;
+            }
+
             if (state.count++ >= ANIMATION_COUNT_THRESHOLD) {
-                // Final state
                 gui.setItem(13, winnerHead);
                 gui.getFiller().fill(new GuiItem(Material.LIGHT_BLUE_STAINED_GLASS_PANE));
                 gui.disableAllInteractions();
@@ -146,13 +156,22 @@ public class CoinflipGUI implements Listener {
                     finalWinAmount -= taxed;
                 }
 
+                if (!game.isActiveGame()) {
+                    return;
+                }
+
                 if (isWinnerThread) {
                     long providedWinAmount = finalWinAmount;
 
                     scheduler.runTask(() -> {
+                        if (!game.isActiveGame()) {
+                            return;
+                        }
+
                         economyManager.getEconomyProvider(game.getProvider()).deposit(winner, providedWinAmount);
                         Bukkit.getPluginManager().callEvent(new CoinflipCompletedEvent(winner, loser, providedWinAmount));
                         plugin.getGameManager().removeCoinflipGame(game.getPlayerUUID());
+                        plugin.getActiveGamesCache().unregister(game);
                     });
 
                     // Update player stats
@@ -166,16 +185,24 @@ public class CoinflipGUI implements Listener {
 
                     if (winner.isOnline()) {
                         Messages.GAME_SUMMARY_WIN.send(winner.getPlayer(), replacePlaceholders(
-                                String.valueOf(taxRate), taxedFormatted, winner.getName(), loser.getName(),
-                                economyManager.getEconomyProvider(game.getProvider()).getDisplayName(), winAmountFormatted
-                        ));
+                                        String.valueOf(taxRate),
+                                        taxedFormatted,
+                                        winner.getName(),
+                                        loser.getName(),
+                                        economyManager.getEconomyProvider(game.getProvider()).getDisplayName(),
+                                        winAmountFormatted)
+                        );
                     }
 
                     if (loser.isOnline()) {
                         Messages.GAME_SUMMARY_LOSS.send(loser.getPlayer(), replacePlaceholders(
-                                String.valueOf(taxRate), taxedFormatted, winner.getName(), loser.getName(),
-                                economyManager.getEconomyProvider(game.getProvider()).getDisplayName(), winAmountFormatted
-                        ));
+                                        String.valueOf(taxRate),
+                                        taxedFormatted,
+                                        winner.getName(),
+                                        loser.getName(),
+                                        economyManager.getEconomyProvider(game.getProvider()).getDisplayName(),
+                                        winAmountFormatted)
+                        );
                     }
 
                     // Broadcast results
@@ -213,7 +240,9 @@ public class CoinflipGUI implements Listener {
                 }
             }
 
-            scheduler.runTaskLaterAtEntity(targetPlayer, task[0], 10L);
+            if (game.isActiveGame()) {
+                scheduler.runTaskLaterAtEntity(targetPlayer, task[0], 10L);
+            }
         };
 
         scheduler.runTaskAtEntity(targetPlayer, task[0]);

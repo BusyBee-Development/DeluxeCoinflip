@@ -15,6 +15,7 @@ import co.aikar.commands.annotation.Optional;
 import co.aikar.commands.annotation.Subcommand;
 import net.zithium.deluxecoinflip.DeluxeCoinflipPlugin;
 import net.zithium.deluxecoinflip.api.events.CoinflipCreatedEvent;
+import net.zithium.deluxecoinflip.cache.ActiveGamesCache;
 import net.zithium.deluxecoinflip.config.ConfigType;
 import net.zithium.deluxecoinflip.config.Messages;
 import net.zithium.deluxecoinflip.economy.EconomyManager;
@@ -41,11 +42,13 @@ public class CoinflipCommand extends BaseCommand {
     private final DeluxeCoinflipPlugin plugin;
     private final EconomyManager economyManager;
     private final GameManager gameManager;
+    private final ActiveGamesCache activeGamesCache;
 
     public CoinflipCommand(final DeluxeCoinflipPlugin plugin) {
         this.plugin = plugin;
         this.economyManager = plugin.getEconomyManager();
         this.gameManager = plugin.getGameManager();
+        this.activeGamesCache = plugin.getActiveGamesCache();
     }
 
     @Default
@@ -142,7 +145,7 @@ public class CoinflipCommand extends BaseCommand {
             return;
         }
 
-        if (gameManager.getCoinflipGames().containsKey(player.getUniqueId())) {
+        if (gameManager.getCoinflipGames().containsKey(player.getUniqueId()) || activeGamesCache.isInGame(player.getUniqueId())) {
             Messages.GAME_ACTIVE.send(player);
             return;
         }

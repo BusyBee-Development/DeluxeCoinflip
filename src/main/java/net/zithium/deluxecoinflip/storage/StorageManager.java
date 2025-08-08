@@ -6,24 +6,17 @@
 package net.zithium.deluxecoinflip.storage;
 
 import net.zithium.deluxecoinflip.DeluxeCoinflipPlugin;
-import net.zithium.deluxecoinflip.config.Messages;
 import net.zithium.deluxecoinflip.exception.InvalidStorageHandlerException;
-import net.zithium.deluxecoinflip.game.CoinflipGame;
-import net.zithium.deluxecoinflip.game.GameManager;
 import net.zithium.deluxecoinflip.storage.handler.StorageHandler;
 import net.zithium.deluxecoinflip.storage.handler.impl.SQLiteHandler;
 import org.bukkit.Bukkit;
-import org.bukkit.OfflinePlayer;
-import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 
-import java.text.NumberFormat;
 import java.util.HashMap;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -99,27 +92,8 @@ public class StorageManager {
 
     public void loadPlayerData(UUID uuid) {
         plugin.getScheduler().runTaskAsynchronously(() -> {
-            PlayerData data = storageHandler.getPlayer(uuid);
-            playerDataMap.put(uuid, data);
-
-            CoinflipGame game = storageHandler.getCoinflipGame(uuid);
-            if (game != null) {
-                plugin.getScheduler().runTask(() -> {
-                    OfflinePlayer player = Bukkit.getOfflinePlayer(uuid);
-                    plugin.getEconomyManager()
-                            .getEconomyProvider(game.getProvider())
-                            .deposit(player, game.getAmount());
-
-                    if (player.isOnline()) {
-                        Messages.GAME_REFUNDED.send(player.getPlayer(),
-                                "{AMOUNT}", NumberFormat.getNumberInstance(Locale.US).format(game.getAmount()),
-                                "{PROVIDER}", game.getProvider());
-                    }
-
-                    storageHandler.deleteCoinfip(uuid);
-                    plugin.getGameManager().removeCoinflipGame(uuid);
-                });
-            }
+            final PlayerData data = storageHandler.getPlayer(uuid);
+            this.playerDataMap.put(uuid, data);
         });
     }
 

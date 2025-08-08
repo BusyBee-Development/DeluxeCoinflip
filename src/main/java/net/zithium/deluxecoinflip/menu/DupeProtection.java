@@ -28,7 +28,9 @@ public record DupeProtection(DeluxeCoinflipPlugin plugin) implements Listener {
     }
 
     private void cleanPlayerInventory(Player player) {
-        if (!player.isOnline()) return;
+        if (!player.isOnline()) {
+            return;
+        }
 
         // Run async to minimize impact on the main thread
         CompletableFuture.supplyAsync(() -> {
@@ -54,7 +56,10 @@ public record DupeProtection(DeluxeCoinflipPlugin plugin) implements Listener {
     }
 
     private boolean isProtected(ItemStack item) {
-        if (item == null || !item.hasItemMeta()) return false;
+        if (item == null || !item.hasItemMeta()) {
+            return false;
+        }
+
         var meta = item.getItemMeta();
         var container = meta.getPersistentDataContainer();
         return container.has(plugin.getKey("dcf.dupeprotection"), PersistentDataType.BYTE);

@@ -10,6 +10,7 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import me.nahu.scheduler.wrapper.FoliaWrappedJavaPlugin;
 import net.zithium.deluxecoinflip.api.DeluxeCoinflipAPI;
+import net.zithium.deluxecoinflip.cache.ActiveGamesCache;
 import net.zithium.deluxecoinflip.command.CoinflipCommand;
 import net.zithium.deluxecoinflip.config.ConfigHandler;
 import net.zithium.deluxecoinflip.config.ConfigType;
@@ -21,21 +22,20 @@ import net.zithium.deluxecoinflip.game.GameManager;
 import net.zithium.deluxecoinflip.hook.DiscordHook;
 import net.zithium.deluxecoinflip.hook.PlaceholderAPIHook;
 import net.zithium.deluxecoinflip.listener.PlayerChatListener;
+import net.zithium.deluxecoinflip.listener.game.ActiveGameQuitListener;
+import net.zithium.deluxecoinflip.listener.game.GameQuitListener;
 import net.zithium.deluxecoinflip.menu.DupeProtection;
 import net.zithium.deluxecoinflip.menu.InventoryManager;
 import net.zithium.deluxecoinflip.storage.PlayerData;
 import net.zithium.deluxecoinflip.storage.StorageManager;
+import net.zithium.deluxecoinflip.utility.GameShutdownUtil;
 import net.zithium.deluxecoinflip.utility.ItemStackBuilder;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
@@ -47,6 +47,7 @@ public class DeluxeCoinflipPlugin extends FoliaWrappedJavaPlugin implements Delu
     private Map<ConfigType, ConfigHandler> configMap;
     private StorageManager storageManager;
     private GameManager gameManager;
+    private ActiveGamesCache activeGamesCache;
     private InventoryManager inventoryManager;
     private EconomyManager economyManager;
     private DiscordHook discordHook;
@@ -59,7 +60,7 @@ public class DeluxeCoinflipPlugin extends FoliaWrappedJavaPlugin implements Delu
 
         getLogger().log(Level.INFO, "");
         getLogger().log(Level.INFO, " __ __    DeluxeCoinflip v" + getDescription().getVersion());
-        getLogger().log(Level.INFO, "/  |_     Author: " + getDescription().getAuthors().get(1));
+        getLogger().log(Level.INFO, "/  |_     Author: " + getDescription().getAuthors().get(0));
         getLogger().log(Level.INFO, "\\_ |      (c) Zithium Studios 2021 - 2025. All rights reserved.");
         getLogger().log(Level.INFO, "");
 
@@ -91,6 +92,8 @@ public class DeluxeCoinflipPlugin extends FoliaWrappedJavaPlugin implements Delu
 
         gameManager = new GameManager(this);
 
+        activeGamesCache = new ActiveGamesCache();
+
         inventoryManager = new InventoryManager();
         inventoryManager.load(this);
         new DupeProtection(this);
@@ -108,6 +111,8 @@ public class DeluxeCoinflipPlugin extends FoliaWrappedJavaPlugin implements Delu
 
         // Register listeners
         new PlayerChatListener(this);
+        new ActiveGameQuitListener(this);
+        new GameQuitListener(this);
 
         // PlaceholderAPI Hook
         if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
@@ -132,6 +137,7 @@ public class DeluxeCoinflipPlugin extends FoliaWrappedJavaPlugin implements Delu
     @Override
     public void onDisable() {
         if (storageManager != null) {
+            GameShutdownUtil.shutdownAll(this);
             storageManager.onDisable(true);
         }
     }
@@ -166,6 +172,10 @@ public class DeluxeCoinflipPlugin extends FoliaWrappedJavaPlugin implements Delu
 
     public GameManager getGameManager() {
         return gameManager;
+    }
+
+    public ActiveGamesCache getActiveGamesCache() {
+        return activeGamesCache;
     }
 
     public EconomyManager getEconomyManager() {

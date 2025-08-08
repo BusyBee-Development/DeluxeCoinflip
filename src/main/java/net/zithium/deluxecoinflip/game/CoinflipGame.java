@@ -10,7 +10,10 @@ import net.zithium.deluxecoinflip.utility.ItemStackBuilder;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.OfflinePlayer;
+import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.UUID;
 
@@ -21,6 +24,9 @@ public class CoinflipGame {
     private String provider;
     private long amount;
     private ItemStack cachedHead;
+
+    private transient volatile boolean activeGame = false;
+    private transient UUID opponent;
 
     public CoinflipGame(UUID uuid, String provider, long amount) {
         this.uuid = uuid;
@@ -44,6 +50,10 @@ public class CoinflipGame {
 
     public UUID getPlayerUUID() {
         return uuid;
+    }
+
+    public @Nullable UUID getOpponentUUID() {
+        return opponent;
     }
 
     public long getAmount() {
@@ -72,5 +82,52 @@ public class CoinflipGame {
 
     public CoinflipGame clone() {
         return new CoinflipGame(uuid, provider, amount, player, cachedHead);
+    }
+
+    public boolean isActiveGame() {
+        return activeGame;
+    }
+
+    public void setActiveGame(boolean activeGame) {
+        this.activeGame = activeGame;
+    }
+
+    public void attachOpponent(@NotNull UUID opponent) {
+        this.opponent = opponent;
+    }
+
+    public void stopAnimation() {
+        this.activeGame = false;
+
+        final Player creatorOnline = (player != null) ? player.getPlayer() : null;
+        final Player opponentOnline = (opponent != null) ? Bukkit.getPlayer(opponent) : null;
+
+        boolean canSchedule = DeluxeCoinflipPlugin.getInstance() != null
+                && DeluxeCoinflipPlugin.getInstance().isEnabled();
+
+        // Creator
+        if (creatorOnline != null) {
+            if (canSchedule) {
+                DeluxeCoinflipPlugin.getInstance().getScheduler()
+                        .runTaskLaterAtEntity(creatorOnline, () -> {
+                            if (creatorOnline.isOnline()) creatorOnline.closeInventory();
+                        }, 20L);
+            } else {
+                // Plugin disabling -> no scheduling allowed
+                if (creatorOnline.isOnline()) creatorOnline.closeInventory();
+            }
+        }
+
+        // Opponent
+        if (opponentOnline != null) {
+            if (canSchedule) {
+                DeluxeCoinflipPlugin.getInstance().getScheduler()
+                        .runTaskLaterAtEntity(opponentOnline, () -> {
+                            if (opponentOnline.isOnline()) opponentOnline.closeInventory();
+                        }, 20L);
+            } else {
+                if (opponentOnline.isOnline()) opponentOnline.closeInventory();
+            }
+        }
     }
 }

@@ -128,6 +128,7 @@ public class GameBuilderGUI {
                     } else if (setAmount.startsWith("-")) {
                         game.setAmount(game.getAmount() - delta);
                     }
+
                     player.playSound(player.getLocation(), Sound.BLOCK_TRIPWIRE_CLICK_ON, 5L, 0L);
 
                     ConfigurationSection currencySection = config.getConfigurationSection("gamebuilder-gui.currency-select");
@@ -156,7 +157,7 @@ public class GameBuilderGUI {
         GuiItem item = new GuiItem(
                 ItemStackBuilder.getItemStack(section).build(),
                 event -> {
-                    gui.close(player);
+                    plugin.getScheduler().runTaskAtEntity(player, () -> gui.close(player));
                     plugin.getListenerCache().put(player.getUniqueId(), game);
                     Messages.ENTER_VALUE_FOR_GAME.send(player,
                             "{MIN_BET}", TextUtil.numberFormat(config.getLong("settings.minimum-bet")),
@@ -198,7 +199,9 @@ public class GameBuilderGUI {
 
             CoinflipCreatedEvent createdEvent = new CoinflipCreatedEvent(player, game);
             Bukkit.getPluginManager().callEvent(createdEvent);
-            if (createdEvent.isCancelled()) return;
+            if (createdEvent.isCancelled()) {
+                return;
+            }
 
             provider.withdraw(player, amount);
             plugin.getGameManager().addCoinflipGame(player.getUniqueId(), game.clone());
@@ -242,6 +245,7 @@ public class GameBuilderGUI {
         } else if (section.contains("slot")) {
             slots.add(section.getInt("slot"));
         }
+
         return slots;
     }
 

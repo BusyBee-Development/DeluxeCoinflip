@@ -19,7 +19,6 @@ import net.zithium.deluxecoinflip.storage.PlayerData;
 import net.zithium.deluxecoinflip.utility.ItemStackBuilder;
 import net.zithium.library.utils.ColorUtil;
 import org.bukkit.Material;
-import org.bukkit.OfflinePlayer;
 import org.bukkit.Sound;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -28,12 +27,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
 import java.text.NumberFormat;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 import java.util.logging.Level;
 
 public class GamesGUI {
@@ -156,7 +150,7 @@ public class GamesGUI {
                 String valueFormatted = numberFormat.format(coinflipGame.getAmount());
                 String taxedFormatted = numberFormat.format(taxed);
 
-                OfflinePlayer playerFromID = coinflipGame.getOfflinePlayer();
+                Player playerFromID = coinflipGame.getOfflinePlayer().getPlayer();
                 if (playerFromID == null) continue;
 
                 ItemStackBuilder builder;
@@ -210,9 +204,10 @@ public class GamesGUI {
 
                     plugin.getScheduler().runTaskAtEntity(player, () -> {
                         event.getWhoClicked().closeInventory();
-                        plugin.getInventoryManager().getCoinflipGUI().startGame(player, playerFromID, game);
+                        plugin.getInventoryManager().getCoinflipGUI().startGame(playerFromID, player, game);
                     });
                 });
+
                 gui.addItem(guiItem);
             }
         }
