@@ -65,6 +65,11 @@ tasks {
             exclude(dependency("com.github.NahuLD.folia-scheduler-wrapper:folia-scheduler-wrapper:.*"))
         }
 
+        dependencies {
+            exclude(dependency("net.kyori:.*"))
+        }
+        exclude("net/kyori/**")
+
         archiveFileName.set("DeluxeCoinflip-${project.version}.jar")
         relocate("dev.triumphteam.gui", "net.zithium.deluxecoinflip.libs.gui")
         relocate("net.zithium.library", "net.zithium.deluxecoinflip.libs.library")
