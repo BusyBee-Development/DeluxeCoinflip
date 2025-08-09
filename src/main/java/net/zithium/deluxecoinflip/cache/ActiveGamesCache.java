@@ -8,6 +8,8 @@ package net.zithium.deluxecoinflip.cache;
 import net.zithium.deluxecoinflip.game.CoinflipGame;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -49,8 +51,8 @@ public final class ActiveGamesCache {
         this.activeGames.entrySet().removeIf(e -> e.getValue() == game);
     }
 
-    public java.util.Collection<CoinflipGame> getAllUniqueGames() {
-        return new java.util.LinkedHashSet<>(this.activeGames.values());
+    public Collection<CoinflipGame> getAllUniqueGames() {
+        return new LinkedHashSet<>(this.activeGames.values());
     }
 
     public void clear() {
