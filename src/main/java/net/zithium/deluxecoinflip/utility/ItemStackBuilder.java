@@ -35,7 +35,7 @@ public record ItemStackBuilder(ItemStack ITEM_STACK) {
 
     public static ItemStackBuilder getItemStack(ConfigurationSection section) {
         if (section == null) {
-            return new ItemStackBuilder(Material.BARRIER).withName("&cInvalid item.");
+            return new ItemStackBuilder(Material.BARRIER).withName("&cInvalid material.");
         }
 
         final String materialName = Objects.toString(section.getString("material"), "BARRIER").toUpperCase();
