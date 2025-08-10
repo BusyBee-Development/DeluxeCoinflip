@@ -16,6 +16,7 @@ import org.bukkit.Material;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
+
 import java.security.SecureRandom;
 
 public record GameAnimationRunner(DeluxeCoinflipPlugin plugin) {
