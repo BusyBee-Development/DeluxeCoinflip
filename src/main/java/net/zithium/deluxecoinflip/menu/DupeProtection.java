@@ -20,17 +20,14 @@ import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
+import java.util.concurrent.CompletableFuture;
 
-public class DupeProtection implements Listener {
+public record DupeProtection(NamespacedKey dupeKey) implements Listener {
 
     private static final String KEY_PATH = "dcf.dupeprotection";
 
-    private final DeluxeCoinflipPlugin plugin;
-    private final NamespacedKey dupeKey;
-
     public DupeProtection(DeluxeCoinflipPlugin plugin) {
-        this.plugin = plugin;
-        this.dupeKey = plugin.getKey(KEY_PATH);
+        this(plugin.getKey(KEY_PATH));
         Bukkit.getPluginManager().registerEvents(this, plugin);
     }
 
@@ -39,7 +36,7 @@ public class DupeProtection implements Listener {
             return;
         }
 
-        plugin.getScheduler().runTaskAtEntity(player, () -> {
+        CompletableFuture.supplyAsync(() -> {
             ItemStack[] contents = player.getInventory().getContents();
             boolean changed = false;
 
@@ -54,6 +51,8 @@ public class DupeProtection implements Listener {
             if (changed && player.isOnline()) {
                 player.getInventory().setContents(contents);
             }
+
+            return changed;
         });
     }
 

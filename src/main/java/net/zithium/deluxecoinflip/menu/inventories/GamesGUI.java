@@ -6,7 +6,6 @@
 package net.zithium.deluxecoinflip.menu.inventories;
 
 import dev.triumphteam.gui.components.GuiAction;
-import dev.triumphteam.gui.guis.Gui;
 import dev.triumphteam.gui.guis.GuiItem;
 import dev.triumphteam.gui.guis.PaginatedGui;
 import net.kyori.adventure.text.Component;
@@ -19,7 +18,7 @@ import net.zithium.deluxecoinflip.game.CoinflipGame;
 import net.zithium.deluxecoinflip.game.GameManager;
 import net.zithium.deluxecoinflip.storage.PlayerData;
 import net.zithium.deluxecoinflip.utility.ItemStackBuilder;
-import net.zithium.library.utils.ColorUtil;
+import net.zithium.deluxecoinflip.utility.TextUtil;
 import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.configuration.ConfigurationSection;
@@ -36,7 +35,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.UnaryOperator;
 import java.util.logging.Level;
 
@@ -44,61 +45,68 @@ public class GamesGUI {
 
     private final DeluxeCoinflipPlugin plugin;
     private final EconomyManager economyManager;
-    private final FileConfiguration config;
-
-    private final ItemStackBuilder materialBuilder;
-    private final String GUI_TITLE;
-    private final int GUI_ROWS;
+    private final Set<UUID> refreshQueued = ConcurrentHashMap.newKeySet();
 
     public GamesGUI(DeluxeCoinflipPlugin plugin) {
         this.plugin = plugin;
         this.economyManager = plugin.getEconomyManager();
-        this.config = plugin.getConfigHandler(ConfigType.CONFIG).getConfig();
-
-        this.GUI_TITLE = ColorUtil.color(config.getString("games-gui.title", "&lCOINFLIP GAMES"));
-        this.GUI_ROWS = config.getInt("games-gui.rows", 6);
-
-        String materialName = config.getString("games-gui.coinflip-game.material", "PLAYER_HEAD");
-        if (!"PLAYER_HEAD".equalsIgnoreCase(materialName)) {
-            Material material = Material.matchMaterial(materialName);
-            this.materialBuilder = (material != null) ? new ItemStackBuilder(material) : null;
-        } else {
-            this.materialBuilder = null;
-        }
     }
 
     public void openInventory(Player player) {
         Optional<PlayerData> optionalPlayerData = plugin.getStorageManager().getPlayer(player.getUniqueId());
         if (optionalPlayerData.isEmpty()) {
-            player.sendMessage(ColorUtil.color("&cYour player data was not found, please relog or contact an administrator if the issue persists."));
+            player.sendMessage(TextUtil.color("&cYour player data was not found, please relog or contact an administrator if the issue persists."));
             return;
         }
 
         PlayerData playerData = optionalPlayerData.get();
+        FileConfiguration config = plugin.getConfigHandler(ConfigType.CONFIG).getConfig();
 
-        PaginatedGui gui = Gui.paginated()
-                .rows(GUI_ROWS)
-                .title(Component.text(GUI_TITLE))
-                .create();
-        gui.setDefaultClickAction(events -> events.setCancelled(true));
+        String guiTitle = TextUtil.color(config.getString("games-gui.title", "&lCOINFLIP GAMES"));
+        int guiRows = config.getInt("games-gui.rows", 6);
 
-        loadFillerItems(gui, player, playerData);
-
-        placeSectionItem(gui, "games-gui.previous-page", player, playerData, events -> gui.previous());
-        placeSectionItem(gui, "games-gui.next-page", player, playerData, events -> gui.next());
-        placeSectionItem(gui, "games-gui.stats", player, playerData, null);
-
-        if (config.getBoolean("games-gui.create-new-game.enabled")) {
-            int newGameSlot = config.getInt("games-gui.create-new-game.slot", -1);
-            ConfigurationSection createSection = config.getConfigurationSection("games-gui.create-new-game");
-            if (newGameSlot >= 0 && createSection != null) {
-                String initialProviderKey = economyManager.getEconomyProviders().keySet().stream().findFirst().orElse(null);
-
-                ItemStack newGameItem = buildItemWithPlaceholders(createSection, line -> applyPlayerStats(line, player, playerData));
-                GuiItem newGameGuiItem = getGuiItem(player, newGameItem, initialProviderKey);
-                gui.setItem(newGameSlot, newGameGuiItem);
+        String materialName = config.getString("games-gui.coinflip-game.material", "PLAYER_HEAD");
+        ItemStackBuilder materialBuilder = null;
+        if (!"PLAYER_HEAD".equalsIgnoreCase(materialName)) {
+            Material material = Material.matchMaterial(materialName);
+            if (material != null) {
+                materialBuilder = new ItemStackBuilder(material);
             }
         }
+
+        PaginatedGui gui = dev.triumphteam.gui.guis.Gui.paginated()
+                .rows(guiRows)
+                .title(Component.text(guiTitle))
+                .create();
+        gui.setDefaultClickAction(events -> events.setCancelled(true));
+        gui.setCloseGuiAction(events -> refreshQueued.remove(player.getUniqueId()));
+
+        loadFillerItems(config, gui, player, playerData);
+
+        placeSectionItem(config, gui, "games-gui.previous-page", player, playerData, events -> gui.previous());
+        placeSectionItem(config, gui, "games-gui.next-page", player, playerData, events -> gui.next());
+        placeSectionItem(config, gui, "games-gui.stats", player, playerData, null);
+        placeSectionItem(config, gui, "games-gui.refresh", player, playerData, events -> {
+            if (!refreshQueued.add(player.getUniqueId())) {
+                return;
+            }
+
+            plugin.getScheduler().runTaskLaterAtEntity(player, () -> {
+                try {
+                    if (!player.isOnline()) {
+                        return;
+                    }
+
+                    if (!player.getOpenInventory().getTopInventory().equals(gui.getInventory())) {
+                        return;
+                    }
+
+                    openInventory(player);
+                } finally {
+                    refreshQueued.remove(player.getUniqueId());
+                }
+            }, 10L);
+        });
 
         GameManager gameManager = plugin.getGameManager();
         if (gameManager.getCoinflipGames().isEmpty()) {
@@ -176,13 +184,12 @@ public class GamesGUI {
 
                     if (selectedProvider.getBalance(player) < selectedGame.getAmount()) {
                         ItemStack previousItem = events.getCurrentItem();
-                        player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1f, 0f);
+
+                        playConfiguredSound(player);
 
                         ConfigurationSection noFundsSection = config.getConfigurationSection("games-gui.error-no-funds");
                         if (noFundsSection != null && events.getClickedInventory() != null) {
-                            events.getClickedInventory().setItem(events.getSlot(),
-                                    ItemStackBuilder.getItemStack(noFundsSection).build());
-
+                            events.getClickedInventory().setItem(events.getSlot(), ItemStackBuilder.getItemStack(noFundsSection).build());
                             plugin.getScheduler().runTaskLater(() -> {
                                 if (events.getClickedInventory() != null) {
                                     events.getClickedInventory().setItem(events.getSlot(), previousItem);
@@ -204,6 +211,17 @@ public class GamesGUI {
                 });
 
                 gui.addItem(gameItem);
+            }
+        }
+
+        if (plugin.getConfigHandler(ConfigType.CONFIG).getConfig().getBoolean("games-gui.create-new-game.enabled")) {
+            int newGameSlot = plugin.getConfigHandler(ConfigType.CONFIG).getConfig().getInt("games-gui.create-new-game.slot", -1);
+            ConfigurationSection createSection = plugin.getConfigHandler(ConfigType.CONFIG).getConfig().getConfigurationSection("games-gui.create-new-game");
+            if (newGameSlot >= 0 && createSection != null) {
+                String initialProviderKey = economyManager.getEconomyProviders().keySet().stream().findFirst().orElse(null);
+                ItemStack newGameItem = buildItemWithPlaceholders(createSection, line -> applyPlayerStats(line, player, playerData));
+                GuiItem newGameGuiItem = getGuiItem(player, newGameItem, initialProviderKey);
+                gui.setItem(newGameSlot, newGameGuiItem);
             }
         }
 
@@ -232,7 +250,7 @@ public class GamesGUI {
         return newGameGuiItem;
     }
 
-    private void loadFillerItems(PaginatedGui gui, Player player, PlayerData data) {
+    private void loadFillerItems(FileConfiguration config, PaginatedGui gui, Player player, PlayerData data) {
         ConfigurationSection fillerSection = config.getConfigurationSection("games-gui.filler-items");
         if (fillerSection == null) {
             plugin.getLogger().log(Level.SEVERE, "Could not find the filler items section in the configuration file!");
@@ -268,11 +286,15 @@ public class GamesGUI {
         }
     }
 
-    private void placeSectionItem(PaginatedGui gui, String path, Player player,
+    private void placeSectionItem(FileConfiguration config, PaginatedGui gui, String path, Player player,
                                   PlayerData data, GuiAction<InventoryClickEvent> clickAction) {
 
         ConfigurationSection section = config.getConfigurationSection(path);
         if (section == null) {
+            return;
+        }
+
+        if (!section.getBoolean("enabled", true)) {
             return;
         }
 
@@ -324,5 +346,26 @@ public class GamesGUI {
                 .replace("{TOTAL_LOSSES}", String.valueOf(data.getTotalLossesFormatted()))
                 .replace("{TOTAL_GAMBLED}", String.valueOf(data.getTotalGambledFormatted()))
                 .replace("{PLAYER}", player.getName());
+    }
+
+    private void playConfiguredSound(Player player) {
+        FileConfiguration cfg = plugin.getConfigHandler(ConfigType.CONFIG).getConfig();
+        ConfigurationSection s = cfg.getConfigurationSection("games-gui.sounds.error_no_funds");
+
+        if (s == null || !s.getBoolean("enabled", true)) {
+            return;
+        }
+
+        String name = s.getString("name", Sound.BLOCK_NOTE_BLOCK_PLING.name());
+        Sound chosen;
+        try {
+            chosen = Sound.valueOf(name.toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            chosen = Sound.BLOCK_NOTE_BLOCK_PLING;
+        }
+
+        float vol = (float) s.getDouble("volume", (float) 1.0);
+        float pitch = (float) s.getDouble("pitch", (float) 0.0);
+        player.playSound(player.getLocation(), chosen, vol, pitch);
     }
 }

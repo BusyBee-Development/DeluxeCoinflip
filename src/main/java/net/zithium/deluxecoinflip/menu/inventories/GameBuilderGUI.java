@@ -17,7 +17,6 @@ import net.zithium.deluxecoinflip.economy.provider.EconomyProvider;
 import net.zithium.deluxecoinflip.game.CoinflipGame;
 import net.zithium.deluxecoinflip.utility.ItemStackBuilder;
 import net.zithium.deluxecoinflip.utility.TextUtil;
-import net.zithium.library.utils.ColorUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.Sound;
 import org.bukkit.configuration.ConfigurationSection;
@@ -31,42 +30,49 @@ import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class GameBuilderGUI {
 
     private final DeluxeCoinflipPlugin plugin;
     private final EconomyManager economyManager;
-    private final FileConfiguration config;
-    private final String GUI_TITLE;
-    private final boolean BROADCAST_CREATION;
+    private final Set<UUID> suppressReturn = ConcurrentHashMap.newKeySet();
 
     public GameBuilderGUI(DeluxeCoinflipPlugin plugin) {
         this.plugin = plugin;
         this.economyManager = plugin.getEconomyManager();
-        this.config = plugin.getConfigHandler(ConfigType.CONFIG).getConfig();
-        this.GUI_TITLE = ColorUtil.color(config.getString("gamebuilder-gui.title", "&lFLIPPING COIN..."));
-        this.BROADCAST_CREATION = config.getBoolean("settings.broadcast-coinflip-creation");
     }
 
     public void openGameBuilderGUI(Player player, CoinflipGame game) {
+        FileConfiguration cfg = plugin.getConfigHandler(ConfigType.CONFIG).getConfig();
+
         Gui gui = Gui.gui()
-                .rows(config.getInt("gamebuilder-gui.rows"))
-                .title(Component.text(GUI_TITLE))
+                .rows(cfg.getInt("gamebuilder-gui.rows"))
+                .title(Component.text(TextUtil.color(cfg.getString("gamebuilder-gui.title", "&lFLIPPING COIN..."))))
                 .create();
 
         gui.setDefaultClickAction(event -> event.setCancelled(true));
 
-        setFillerItems(gui);
-        setupCurrencySelector(gui, player, game);
-        setupAmountItems(gui, player, game);
-        setupCustomAmount(gui, player, game);
-        setupCreateGame(gui, player, game);
+        gui.setCloseGuiAction(event -> {
+            Player p = (Player) event.getPlayer();
+            if (!suppressReturn.remove(p.getUniqueId())) {
+                plugin.getScheduler().runTaskAtEntity(p, () -> plugin.getInventoryManager().getGamesGUI().openInventory(p));
+            }
+        });
+
+        setFillerItems(gui, cfg);
+        setupCurrencySelector(gui, player, game, cfg);
+        setupAmountItems(gui, player, game, cfg);
+        setupCustomAmount(gui, player, game, cfg);
+        setupCreateGame(gui, player, game, cfg);
 
         plugin.getScheduler().runTaskAtEntity(player, () -> gui.open(player));
     }
 
-    private void setFillerItems(Gui gui) {
-        ConfigurationSection section = config.getConfigurationSection("gamebuilder-gui.filler-items");
+    private void setFillerItems(Gui gui, FileConfiguration cfg) {
+        ConfigurationSection section = cfg.getConfigurationSection("gamebuilder-gui.filler-items");
         if (section == null) {
             return;
         }
@@ -85,13 +91,7 @@ public class GameBuilderGUI {
         }
     }
 
-    private void setupCurrencySelector(Gui gui, Player player, CoinflipGame game) {
-        ConfigurationSection section = config.getConfigurationSection("gamebuilder-gui.currency-select");
-        if (section == null || !section.getBoolean("enabled", true)) {
-            return;
-        }
-
-        int slot = section.getInt("slot");
+    private GuiItem createCurrencyGuiItem(Gui gui, ConfigurationSection section, Player player, CoinflipGame game) {
         ItemStack item = ItemStackBuilder.getItemStack(section)
                 .withLore(getCurrencyLore(section, game))
                 .build();
@@ -103,15 +103,26 @@ public class GameBuilderGUI {
                     .withLore(getCurrencyLore(section, game))
                     .build();
             guiItem.setItemStack(updated);
-            player.playSound(player.getLocation(), Sound.ENTITY_CHICKEN_EGG, 1f, 0f);
+            playConfiguredSound(player, "gamebuilder-gui.sounds.currency_select_click", Sound.BLOCK_TRIPWIRE_CLICK_ON);
             gui.update();
         });
 
+        return guiItem;
+    }
+
+    private void setupCurrencySelector(Gui gui, Player player, CoinflipGame game, FileConfiguration cfg) {
+        ConfigurationSection section = cfg.getConfigurationSection("gamebuilder-gui.currency-select");
+        if (section == null || !section.getBoolean("enabled", true)) {
+            return;
+        }
+
+        int slot = section.getInt("slot");
+        GuiItem guiItem = createCurrencyGuiItem(gui, section, player, game);
         gui.setItem(slot, guiItem);
     }
 
-    private void setupAmountItems(Gui gui, Player player, CoinflipGame game) {
-        ConfigurationSection section = config.getConfigurationSection("gamebuilder-gui.amount-items");
+    private void setupAmountItems(Gui gui, Player player, CoinflipGame game, FileConfiguration cfg) {
+        ConfigurationSection section = cfg.getConfigurationSection("gamebuilder-gui.amount-items");
         if (section == null) {
             return;
         }
@@ -139,15 +150,13 @@ public class GameBuilderGUI {
                         }
                     }
 
-                    player.playSound(player.getLocation(), Sound.BLOCK_TRIPWIRE_CLICK_ON, 1f, 0f);
+                    playConfiguredSound(player, "gamebuilder-gui.sounds.amount_adjust_click", Sound.BLOCK_TRIPWIRE_CLICK_ON);
 
-                    ConfigurationSection currencySection = config.getConfigurationSection("gamebuilder-gui.currency-select");
+                    ConfigurationSection currencySection = cfg.getConfigurationSection("gamebuilder-gui.currency-select");
                     if (currencySection != null && currencySection.getBoolean("enabled", true)) {
                         int currencySlot = currencySection.getInt("slot");
-                        ItemStack updatedCurrencyItem = ItemStackBuilder.getItemStack(currencySection)
-                                .withLore(getCurrencyLore(currencySection, game))
-                                .build();
-                        gui.setItem(currencySlot, new GuiItem(updatedCurrencyItem));
+                        GuiItem updatedCurrency = createCurrencyGuiItem(gui, currencySection, player, game);
+                        gui.setItem(currencySlot, updatedCurrency);
                     }
 
                     gui.update();
@@ -158,8 +167,8 @@ public class GameBuilderGUI {
         }
     }
 
-    private void setupCustomAmount(Gui gui, Player player, CoinflipGame game) {
-        ConfigurationSection section = config.getConfigurationSection("gamebuilder-gui.custom-amount");
+    private void setupCustomAmount(Gui gui, Player player, CoinflipGame game, FileConfiguration cfg) {
+        ConfigurationSection section = cfg.getConfigurationSection("gamebuilder-gui.custom-amount");
         if (section == null) {
             return;
         }
@@ -167,20 +176,21 @@ public class GameBuilderGUI {
         GuiItem item = new GuiItem(
                 ItemStackBuilder.getItemStack(section).build(),
                 event -> {
+                    suppressReturn.add(player.getUniqueId());
                     plugin.getScheduler().runTaskAtEntity(player, () -> gui.close(player));
                     plugin.getListenerCache().put(player.getUniqueId(), game);
                     Messages.ENTER_VALUE_FOR_GAME.send(
                             player,
-                            "{MIN_BET}", TextUtil.numberFormat(config.getLong("settings.minimum-bet")),
-                            "{MAX_BET}", TextUtil.numberFormat(config.getLong("settings.maximum-bet"))
+                            "{MIN_BET}", TextUtil.numberFormat(cfg.getLong("settings.minimum-bet")),
+                            "{MAX_BET}", TextUtil.numberFormat(cfg.getLong("settings.maximum-bet"))
                     );
                 });
 
         gui.setItem(section.getInt("slot"), item);
     }
 
-    private void setupCreateGame(Gui gui, Player player, CoinflipGame game) {
-        ConfigurationSection section = config.getConfigurationSection("gamebuilder-gui.create-game");
+    private void setupCreateGame(Gui gui, Player player, CoinflipGame game, FileConfiguration cfg) {
+        ConfigurationSection section = cfg.getConfigurationSection("gamebuilder-gui.create-game");
         if (section == null) {
             return;
         }
@@ -189,24 +199,25 @@ public class GameBuilderGUI {
             EconomyProvider provider = economyManager.getEconomyProvider(game.getProvider());
 
             if (plugin.getGameManager().getCoinflipGames().containsKey(player.getUniqueId())) {
-                handleError(player, event, "gamebuilder-gui.error-game-exists");
+                handleError(player, event, cfg, "gamebuilder-gui.error-game-exists");
                 return;
             }
 
             long amount = game.getAmount();
-            long min = config.getLong("settings.minimum-bet");
-            long max = config.getLong("settings.maximum-bet");
+            long min = cfg.getLong("settings.minimum-bet");
+            long max = cfg.getLong("settings.maximum-bet");
 
             if (amount < min || amount > max) {
-                handleError(player, event, "gamebuilder-gui.error-limits");
+                handleError(player, event, cfg, "gamebuilder-gui.error-limits");
                 return;
             }
 
             if (amount > (long) provider.getBalance(player)) {
-                handleError(player, event, "gamebuilder-gui.error-no-funds");
+                handleError(player, event, cfg, "gamebuilder-gui.error-no-funds");
                 return;
             }
 
+            suppressReturn.add(player.getUniqueId());
             plugin.getScheduler().runTaskAtEntity(player, () -> gui.close(player));
 
             CoinflipCreatedEvent createdEvent = new CoinflipCreatedEvent(player, game);
@@ -220,7 +231,7 @@ public class GameBuilderGUI {
 
             String formatted = NumberFormat.getNumberInstance(Locale.US).format(amount);
 
-            if (BROADCAST_CREATION) {
+            if (cfg.getBoolean("settings.broadcast-coinflip-creation")) {
                 Messages.COINFLIP_CREATED_BROADCAST.broadcast(
                         "{PLAYER}", player.getName(),
                         "{CURRENCY}", provider.getDisplayName(),
@@ -289,23 +300,16 @@ public class GameBuilderGUI {
         return keys.get((index + 1) % keys.size());
     }
 
-    /**
-     * Plays an error sound, temporarily changes the clicked item to an error indicator,
-     * and restores it after a delay.
-     * Fixes:
-     * - Guard against null clicked inventory (setItem could NPE).
-     * - Guard against missing config section for the error item.
-     */
-    private void handleError(Player player, InventoryClickEvent event, String configPath) {
+    private void handleError(Player player, InventoryClickEvent event, FileConfiguration cfg, String configPath) {
         Inventory clicked = event.getClickedInventory();
         if (clicked == null) {
             return;
         }
 
         ItemStack original = event.getCurrentItem();
-        player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1f, 0f);
+        playConfiguredSound(player, "gamebuilder-gui.sounds.error", Sound.BLOCK_NOTE_BLOCK_PLING);
 
-        ConfigurationSection errorSection = config.getConfigurationSection(configPath);
+        ConfigurationSection errorSection = cfg.getConfigurationSection(configPath);
         if (errorSection != null) {
             clicked.setItem(event.getSlot(), ItemStackBuilder.getItemStack(errorSection).build());
             plugin.getScheduler().runTaskLater(() -> {
@@ -314,5 +318,26 @@ public class GameBuilderGUI {
                 }
             }, 45L);
         }
+    }
+
+    private void playConfiguredSound(Player player, String path, Sound def) {
+        FileConfiguration cfg = plugin.getConfigHandler(ConfigType.CONFIG).getConfig();
+        ConfigurationSection s = cfg.getConfigurationSection(path);
+
+        if (s == null || !s.getBoolean("enabled", true)) {
+            return;
+        }
+
+        String name = s.getString("name", def.name());
+        Sound chosen;
+        try {
+            chosen = Sound.valueOf(name.toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            chosen = def;
+        }
+
+        float vol = (float) s.getDouble("volume", (float) 1.0);
+        float pitch = (float) s.getDouble("pitch", (float) 0.0);
+        player.playSound(player.getLocation(), chosen, vol, pitch);
     }
 }

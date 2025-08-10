@@ -6,7 +6,6 @@
 package net.zithium.deluxecoinflip.config;
 
 import net.zithium.deluxecoinflip.utility.TextUtil;
-import net.zithium.library.utils.ColorUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -86,7 +85,7 @@ public enum Messages {
             return;
         }
 
-        String colored = ColorUtil.color(replace(message, replacements));
+        String colored = TextUtil.color(replace(message, replacements));
         if (colored == null || colored.isEmpty()) {
             return;
         }

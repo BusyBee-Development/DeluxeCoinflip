@@ -26,7 +26,7 @@ public class CoinflipGame implements Cloneable {
     private ItemStack cachedHead;
 
     private transient volatile boolean activeGame = false;
-    private transient UUID opponent;
+    private transient volatile UUID opponent;
 
     public CoinflipGame(UUID uuid, String provider, long amount) {
         this.uuid = uuid;
@@ -69,7 +69,7 @@ public class CoinflipGame implements Cloneable {
     }
 
     public ItemStack getCachedHead() {
-        return cachedHead.clone();
+        return cachedHead != null ? cachedHead.clone() : new ItemStack(Material.PLAYER_HEAD);
     }
 
     public String getProvider() {
