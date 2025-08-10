@@ -39,6 +39,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class CoinflipGUI implements Listener {
 
@@ -118,17 +119,22 @@ public class CoinflipGUI implements Listener {
                 : new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
 
         class AnimationState {
-            boolean alternate = java.util.concurrent.ThreadLocalRandom.current().nextBoolean(); // random first frame
+            boolean alternate = ThreadLocalRandom.current().nextBoolean();
             int count = 0;
         }
+
         AnimationState state = new AnimationState();
 
         long winAmount = game.getAmount() * 2L;
         long beforeTax = winAmount / 2L;
 
-        // Re-open if player pressed E or switched away
-        Runnable ensureOpen = () -> {
-            if (!targetPlayer.isOnline()) return;
+        // Re-open if player attempted to exit the menu
+        Runnable ensureOpen = () ->
+            scheduler.runTaskAtEntity(targetPlayer, () -> {
+            if (!targetPlayer.isOnline()) {
+                return;
+            }
+
             InventoryView view = targetPlayer.getOpenInventory();
             if (view.getTopInventory() != gui.getInventory()) {
                 try {
@@ -137,16 +143,21 @@ public class CoinflipGUI implements Listener {
                     targetPlayer.openInventory(gui.getInventory());
                 }
             }
-        };
+        });
 
         Runnable[] task = new Runnable[1];
         task[0] = () -> {
             if (!game.isActiveGame()) {
-                scheduler.runTaskLater(() -> { if (targetPlayer.isOnline()) targetPlayer.closeInventory(); }, 20L);
+                scheduler.runTaskLaterAtEntity(targetPlayer, () -> {
+                    if (targetPlayer.isOnline()) {
+                        targetPlayer.closeInventory();
+                    }
+                }, 20L);
+
                 return;
             }
 
-            // keep it open during the whole animation
+            // Ensure the GUI remains open
             ensureOpen.run();
 
             if (state.count++ >= ANIMATION_COUNT_THRESHOLD) {
@@ -157,8 +168,12 @@ public class CoinflipGUI implements Listener {
 
                 if (targetPlayer.isOnline()) {
                     targetPlayer.playSound(targetPlayer.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1f, 1f);
+                    scheduler.runTaskLaterAtEntity(targetPlayer, () -> {
+                        if (targetPlayer.isOnline()) {
+                            targetPlayer.closeInventory();
+                        }
+                    }, 20L);
                 }
-                scheduler.runTaskLater(() -> { if (targetPlayer.isOnline()) targetPlayer.closeInventory(); }, 20L);
 
                 long taxed = 0L;
                 long finalWinAmount = winAmount;
@@ -166,12 +181,19 @@ public class CoinflipGUI implements Listener {
                     taxed = (long) ((taxRate * winAmount) / 100.0);
                     finalWinAmount -= taxed;
                 }
-                if (!game.isActiveGame()) return;
+
+                if (!game.isActiveGame()) {
+                    return;
+                }
 
                 if (isWinnerThread) {
                     long providedWinAmount = finalWinAmount;
+
                     scheduler.runTask(() -> {
-                        if (!game.isActiveGame()) return;
+                        if (!game.isActiveGame()) {
+                            return;
+                        }
+
                         economyManager.getEconomyProvider(game.getProvider()).deposit(winner, providedWinAmount);
                         Bukkit.getPluginManager().callEvent(new CoinflipCompletedEvent(winner, loser, providedWinAmount));
                         plugin.getGameManager().removeCoinflipGame(game.getPlayerUUID());
@@ -191,6 +213,7 @@ public class CoinflipGUI implements Listener {
                                 String.valueOf(taxRate), taxedFormatted, winner.getName(), loser.getName(),
                                 providerName, winAmountFormatted));
                     }
+
                     if (loser.isOnline()) {
                         Messages.GAME_SUMMARY_LOSS.send(loser.getPlayer(), replacePlaceholders(
                                 String.valueOf(taxRate), taxedFormatted, winner.getName(), loser.getName(),
@@ -200,13 +223,17 @@ public class CoinflipGUI implements Listener {
                     broadcastWinningMessage(finalWinAmount, taxed, winner.getName(), loser.getName(), providerName);
                     if (config.getBoolean("discord.webhook.enabled", false) || config.getBoolean("discord.bot.enabled", false)) {
                         plugin.getDiscordHook().executeWebhook(winner, loser, providerName, winAmount)
-                                .exceptionally(ex -> { plugin.getLogger().severe("Discord webhook error"); ex.printStackTrace(); return null; });
+                            .exceptionally(ex -> {
+                                plugin.getLogger().severe("Discord webhook error");
+                                ex.printStackTrace();
+                                return null;
+                            });
                     }
                 }
                 return;
             }
 
-            // animation tick
+            // Animation tick
             gui.setItem(13, state.alternate ? winnerHead : loserHead);
             GuiItem filler = new GuiItem((state.alternate ? firstAnimationItem : secondAnimationItem).clone());
             for (int i = 0; i < gui.getInventory().getSize(); i++) {
@@ -216,15 +243,17 @@ public class CoinflipGUI implements Listener {
 
             if (targetPlayer.isOnline()) {
                 targetPlayer.playSound(targetPlayer.getLocation(), Sound.BLOCK_WOODEN_BUTTON_CLICK_ON, 1f, 1f);
+                if (targetPlayer.getOpenInventory().getTopInventory().equals(gui.getInventory())) {
+                    gui.update();
+                }
             }
-            gui.update();
 
             if (game.isActiveGame()) {
-                scheduler.runTaskLater(task[0], 10L); // not entity-bound
+                scheduler.runTaskLaterAtEntity(targetPlayer, task[0], 10L);
             }
         };
 
-        scheduler.runTask(task[0]); // not entity-bound
+        scheduler.runTaskAtEntity(targetPlayer, task[0]);
     }
 
     private void updatePlayerStats(StorageManager storageManager, OfflinePlayer player, long winAmount, long beforeTax, boolean isWinner) {
