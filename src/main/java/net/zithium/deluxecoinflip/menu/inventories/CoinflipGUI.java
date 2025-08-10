@@ -118,7 +118,8 @@ public class CoinflipGUI implements Listener {
                 : new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
 
         class AnimationState {
-            boolean alternate = random.nextBoolean();
+            boolean headRandomization = random.nextBoolean();
+            boolean glassRandomization = random.nextBoolean();
             int count = 0;
         }
 
@@ -232,13 +233,15 @@ public class CoinflipGUI implements Listener {
                 return;
             }
 
-            // Animation tick
-            gui.setItem(13, state.alternate ? winnerHead : loserHead);
-            GuiItem filler = new GuiItem((state.alternate ? firstAnimationItem : secondAnimationItem).clone());
+            // Animation tick: alternate, but with random first frame
+            gui.setItem(13, state.headRandomization ? winnerHead : loserHead);
+            GuiItem filler = new GuiItem((state.glassRandomization ? firstAnimationItem : secondAnimationItem).clone());
             for (int i = 0; i < gui.getInventory().getSize(); i++) {
                 if (i != 13) gui.setItem(i, filler);
             }
-            state.alternate = !state.alternate;
+
+            state.headRandomization = !state.headRandomization;
+            state.glassRandomization = !state.glassRandomization;
 
             if (targetPlayer.isOnline()) {
                 targetPlayer.playSound(targetPlayer.getLocation(), Sound.BLOCK_WOODEN_BUTTON_CLICK_ON, 1f, 1f);
