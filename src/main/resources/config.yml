@@ -110,7 +110,7 @@ discord:
     embed:
       enabled: true
       title: "%amount% %currency%"
-      description: "%winner% (Winner) VS %loser%"
+      description: "%winner% (Winner) vs %loser%"
       color:
         r: 0
         g: 0

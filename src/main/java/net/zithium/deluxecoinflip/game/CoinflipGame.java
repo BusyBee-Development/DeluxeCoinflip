@@ -17,7 +17,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.UUID;
 
-public class CoinflipGame {
+public class CoinflipGame implements Cloneable {
 
     private final UUID uuid;
     private OfflinePlayer player;
@@ -80,8 +80,15 @@ public class CoinflipGame {
         this.provider = provider;
     }
 
+    @Override
     public CoinflipGame clone() {
-        return new CoinflipGame(uuid, provider, amount, player, cachedHead);
+        try {
+            CoinflipGame copy = (CoinflipGame) super.clone();
+            copy.cachedHead = (this.cachedHead != null) ? this.cachedHead.clone() : null;
+            return copy;
+        } catch (CloneNotSupportedException e) {
+            throw new AssertionError(e);
+        }
     }
 
     public boolean isActiveGame() {
@@ -108,25 +115,30 @@ public class CoinflipGame {
         // Creator
         if (creatorOnline != null) {
             if (canSchedule) {
-                DeluxeCoinflipPlugin.getInstance().getScheduler()
-                        .runTaskLaterAtEntity(creatorOnline, () -> {
-                            if (creatorOnline.isOnline()) creatorOnline.closeInventory();
-                        }, 20L);
+                DeluxeCoinflipPlugin.getInstance().getScheduler().runTaskLaterAtEntity(creatorOnline, () -> {
+                    if (creatorOnline.isOnline()) {
+                        creatorOnline.closeInventory();
+                    }
+                }, 20L);
             } else {
-                // Plugin disabling -> no scheduling allowed
-                if (creatorOnline.isOnline()) creatorOnline.closeInventory();
+                if (creatorOnline.isOnline()) {
+                    creatorOnline.closeInventory();
+                }
             }
         }
 
         // Opponent
         if (opponentOnline != null) {
             if (canSchedule) {
-                DeluxeCoinflipPlugin.getInstance().getScheduler()
-                        .runTaskLaterAtEntity(opponentOnline, () -> {
-                            if (opponentOnline.isOnline()) opponentOnline.closeInventory();
-                        }, 20L);
+                DeluxeCoinflipPlugin.getInstance().getScheduler().runTaskLaterAtEntity(opponentOnline, () -> {
+                    if (opponentOnline.isOnline()) {
+                        opponentOnline.closeInventory();
+                    }
+                }, 20L);
             } else {
-                if (opponentOnline.isOnline()) opponentOnline.closeInventory();
+                if (opponentOnline.isOnline()) {
+                    opponentOnline.closeInventory();
+                }
             }
         }
     }

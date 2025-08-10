@@ -34,7 +34,9 @@ public class PlaceholderAPIHook extends PlaceholderExpansion {
         return true;
     }
 
+    // We are aware that this is deprecated.
     @Override
+    @SuppressWarnings("deprecation")
     public @NotNull String getAuthor() {
         return plugin.getDescription().getAuthors().toString();
     }
@@ -44,14 +46,18 @@ public class PlaceholderAPIHook extends PlaceholderExpansion {
         return "deluxecoinflip";
     }
 
+    // We are aware that this is deprecated.
     @Override
+    @SuppressWarnings("deprecation")
     public @NotNull String getVersion() {
         return plugin.getDescription().getVersion();
     }
 
     @Override
     public String onPlaceholderRequest(Player player, @NotNull String identifier) {
-        if (player == null) return "";
+        if (player == null) {
+            return "";
+        }
 
         Optional<PlayerData> playerDataOptional = storageManager.getPlayer(player.getUniqueId());
         if (playerDataOptional.isEmpty()) {

@@ -8,19 +8,19 @@ package net.zithium.deluxecoinflip.listener.game;
 import net.zithium.deluxecoinflip.DeluxeCoinflipPlugin;
 import net.zithium.deluxecoinflip.cache.ActiveGamesCache;
 import net.zithium.deluxecoinflip.config.Messages;
+import net.zithium.deluxecoinflip.economy.EconomyManager;
 import net.zithium.deluxecoinflip.economy.provider.EconomyProvider;
 import net.zithium.deluxecoinflip.game.CoinflipGame;
+import org.bukkit.Server;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.jetbrains.annotations.NotNull;
 
-import java.text.NumberFormat;
-import java.util.ArrayList;
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 
 public final class ActiveGameQuitListener implements Listener {
@@ -31,7 +31,6 @@ public final class ActiveGameQuitListener implements Listener {
         this.plugin = plugin;
         this.activeGamesCache = plugin.getActiveGamesCache();
 
-        // Register the listener
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
     }
 
@@ -39,44 +38,41 @@ public final class ActiveGameQuitListener implements Listener {
     public void onPlayerQuit(@NotNull PlayerQuitEvent event) {
         final Player quitter = event.getPlayer();
 
-        // Get the player's game
         final CoinflipGame game = this.activeGamesCache.getGame(quitter.getUniqueId());
         if (game == null || !game.isActiveGame()) {
             return;
         }
 
-        // Stop the animation
+        final Set<UUID> participants = new LinkedHashSet<>(this.activeGamesCache.getParticipants(game));
+
         game.stopAnimation();
-
-        // Get participants
-        final List<UUID> participants = new ArrayList<>(new LinkedHashSet<>(
-                this.activeGamesCache.getParticipants(game)
-        ));
-
-        // Remove from active cache
         this.activeGamesCache.unregister(game);
 
-        // Prepare economy and amount string
-        final EconomyProvider economyProvider = this.plugin.getEconomyManager()
-                .getEconomyProvider(game.getProvider());
-        final String amountStr = NumberFormat.getNumberInstance(Locale.US)
-                .format(game.getAmount());
+        final Server server = this.plugin.getServer();
+        final EconomyManager economyManager = this.plugin.getEconomyManager();
+        final EconomyProvider economyProvider = economyManager.getEconomyProvider(game.getProvider());
+        if (economyProvider == null) {
+            this.plugin.getLogger().warning("Missing economy provider '" + game.getProvider() + "'; refunds skipped.");
+            this.plugin.getGameManager().removeCoinflipGame(game.getPlayerUUID());
+            return;
+        }
 
-        // Notify and refund all participants
+        final long amount = game.getAmount();
+        final String amountFormatted = String.format(Locale.US, "%,d", amount);
+
         for (UUID participantId : participants) {
-            final Player participant = this.plugin.getServer().getPlayer(participantId);
+            final Player participant = server.getPlayer(participantId);
             if (participant != null) {
                 Messages.GAME_REFUNDED.send(
                         participant,
-                        "{AMOUNT}", amountStr,
+                        "{AMOUNT}", amountFormatted,
                         "{PROVIDER}", game.getProvider()
                 );
             }
 
-            economyProvider.deposit(this.plugin.getServer().getOfflinePlayer(participantId), game.getAmount());
+            economyProvider.deposit(server.getOfflinePlayer(participantId), amount);
         }
 
-        // Remove game listing
         this.plugin.getGameManager().removeCoinflipGame(game.getPlayerUUID());
     }
 }

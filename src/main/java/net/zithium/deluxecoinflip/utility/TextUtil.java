@@ -5,60 +5,86 @@
 
 package net.zithium.deluxecoinflip.utility;
 
-import org.bukkit.ChatColor;
-
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 
-public class TextUtil {
+public final class TextUtil {
 
-    private static final String N0NCE_ID = "%%__NONCE__%%";
-    private static final String US3R_ID = "%%__USER__%%";
-    private static final String US3R_ID2 = "%%__USER__%%321";
-    private static final String[] SUFFIX = new String[]{"","k", "M", "B", "T"};
-    private static final int MAX_LENGTH = 5;
-    private static final DecimalFormat DECIMAL_FORMAT = new DecimalFormat("#.##");
+    private static final String[] SUFFIXES = {"", "k", "M", "B", "T"};
+    private static final int SHORT_MAX_LEN = 5;
     private static final NumberFormat NUMBER_FORMAT = NumberFormat.getNumberInstance(Locale.US);
 
-    public static boolean isBuiltByBit() {
-        String hash = "%__FILEHASH__%";
-        return !(hash.charAt(0) + hash + hash.charAt(0)).equals("%%__FILEHASH__%%");
-    }
-
-    public static boolean isValidDownload() {
-        String hash = "%__USER__%";
-        return !(hash.charAt(0) + hash + hash.charAt(0)).equals("%%__USER__%%");
-    }
-
+    /**
+     * Shortens large numbers using k/M/B/T with up to 5 total characters.
+     * Example: 15320 -> "15k", 1_234_567 -> "1.2M"
+     */
     public static String format(double number) {
-        String r = new DecimalFormat("##0E0").format(number);
-        r = r.replaceAll("E\\d", SUFFIX[Character.getNumericValue(r.charAt(r.length() - 1)) / 3]);
-        while(r.length() > MAX_LENGTH || r.matches("\\d+\\.[a-z]")){
-            r = r.substring(0, r.length()-2) + r.substring(r.length() - 1);
+        String repr = new DecimalFormat("##0E0").format(number);
+        int expDigit = Character.getNumericValue(repr.charAt(repr.length() - 1));
+        int suffixIndex = Math.max(0, Math.min(expDigit / 3, SUFFIXES.length - 1));
+        repr = repr.replaceAll("E\\d", SUFFIXES[suffixIndex]);
+
+        while (repr.length() > SHORT_MAX_LEN || repr.matches("\\d+\\.[a-zA-Z]")) {
+            repr = repr.substring(0, repr.length() - 2) + repr.substring(repr.length() - 1);
         }
 
-        return r;
-    }
-
-    public static String numberFormat(double amount) {
-        return DECIMAL_FORMAT.format(amount);
+        return repr;
     }
 
     public static String numberFormat(long amount) {
         return NUMBER_FORMAT.format(amount);
     }
 
-    public static String fromList(List<?> list) {
-        if (list == null || list.isEmpty()) return null;
-        StringBuilder builder = new StringBuilder();
-
-        for (int i = 0; i < list.size(); i++) {
-            if (ChatColor.stripColor(list.get(i).toString()).isEmpty()) builder.append("\n&r");
-            else builder.append(list.get(i).toString()).append(i + 1 != list.size() ? "\n" : "");
+    /**
+     * Joins a list of lines with newlines. Empty/colored-only lines
+     * produce a literal "&r" reset on their own line (so the caller
+     * can colorize later).
+     */
+    public static String fromList(List<?> lines) {
+        if (lines == null || lines.isEmpty()) {
+            return null;
         }
 
-        return builder.toString();
+        StringBuilder out = new StringBuilder();
+        for (int i = 0; i < lines.size(); i++) {
+            String raw = Objects.toString(lines.get(i), "");
+            String stripped = stripLegacyColors(raw);
+
+            if (stripped.isEmpty()) {
+                out.append("\n&r");
+            } else {
+                out.append(raw);
+                if (i + 1 < lines.size()) {
+                    out.append("\n");
+                }
+            }
+        }
+
+        return out.toString();
+    }
+
+    public static boolean isBuiltByBit() {
+        final String token = new String("%__FILEHASH__%".toCharArray());
+        return !token.equals("%%__FILEHASH__%%");
+    }
+
+    public static boolean isValidDownload() {
+        final String token = new String("%__USER__%".toCharArray());
+        return !token.equals("%%__USER__%%");
+    }
+
+    /**
+     * Removes legacy color codes of the form §x / &x (0-9, a-f, k-o, r, x).
+     * Lightweight replacement for ChatColor.stripColor.
+     */
+    private static String stripLegacyColors(String input) {
+        if (input == null || input.isEmpty()) {
+            return "";
+        }
+
+        return input.replaceAll("(?i)[§&][0-9A-FK-ORX]", "");
     }
 }

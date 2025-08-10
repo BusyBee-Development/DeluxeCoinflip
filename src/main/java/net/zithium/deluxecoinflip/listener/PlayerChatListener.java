@@ -5,6 +5,8 @@
 
 package net.zithium.deluxecoinflip.listener;
 
+import io.papermc.paper.event.player.AsyncChatEvent;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import net.zithium.deluxecoinflip.DeluxeCoinflipPlugin;
 import net.zithium.deluxecoinflip.config.ConfigType;
 import net.zithium.deluxecoinflip.config.Messages;
@@ -16,7 +18,6 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 
-import java.text.NumberFormat;
 import java.util.Locale;
 import java.util.UUID;
 
@@ -24,56 +25,145 @@ public record PlayerChatListener(DeluxeCoinflipPlugin plugin) implements Listene
 
     public PlayerChatListener(DeluxeCoinflipPlugin plugin) {
         this.plugin = plugin;
-        plugin.getServer().getPluginManager().registerEvents(this, plugin);
+
+        try {
+            Class.forName("io.papermc.paper.event.player.AsyncChatEvent", false, plugin.getClass().getClassLoader());
+            plugin.getServer().getPluginManager().registerEvents(new PaperHandler(plugin), plugin);
+        } catch (ClassNotFoundException ignored) {
+            plugin.getServer().getPluginManager().registerEvents(new SpigotHandler(plugin), plugin);
+        }
     }
 
-    @EventHandler(priority = EventPriority.LOWEST)
-    public void onPlayerChat(AsyncPlayerChatEvent event) {
-        Player player = event.getPlayer();
-        UUID uuid = player.getUniqueId();
+    /**
+     * Paper handler using AsyncChatEvent + Adventure.
+     * Only registered when Paper's event exists.
+     */
+    private record PaperHandler(DeluxeCoinflipPlugin plugin) implements Listener {
 
-        CoinflipGame game = plugin.getListenerCache().getIfPresent(uuid);
-        if (game == null) {
-            return;
-        }
+        @EventHandler(priority = EventPriority.LOWEST)
+        public void onPlayerChat(AsyncChatEvent event) {
+            final Player player = event.getPlayer();
+            final UUID uuid = player.getUniqueId();
 
-        if (event.getMessage().trim().equalsIgnoreCase("cancel")) {
+            final CoinflipGame game = plugin.getListenerCache().getIfPresent(uuid);
+            if (game == null) {
+                return;
+            }
+
+            if (game.isActiveGame()) {
+                return;
+            }
+
+            final String message = PlainTextComponentSerializer.plainText()
+                    .serialize(event.message())
+                    .trim();
+
+            if (message.equalsIgnoreCase("cancel")) {
+                event.setCancelled(true);
+                plugin.getListenerCache().invalidate(uuid);
+                Messages.CHAT_CANCELLED.send(player);
+                plugin.getScheduler().runTask(() -> plugin.getInventoryManager().getGameBuilderGUI().openGameBuilderGUI(player, game));
+                return;
+            }
+
+            final long amount;
+            try {
+                final String digits = message.replace(",", "").replaceAll("[^0-9]", "");
+                amount = Long.parseLong(digits);
+            } catch (Exception ex) {
+                event.setCancelled(true);
+                Messages.INVALID_AMOUNT.send(player, "{INPUT}", message.replace(",", ""));
+                return;
+            }
+
+            final FileConfiguration config = plugin.getConfigHandler(ConfigType.CONFIG).getConfig();
+            final long maximumBet = config.getLong("settings.maximum-bet");
+            final long minimumBet = config.getLong("settings.minimum-bet");
+
+            if (amount > maximumBet) {
+                event.setCancelled(true);
+                Messages.CREATE_MAXIMUM_AMOUNT.send(player, "{MAX_BET}", String.format(Locale.US, "%,d", maximumBet));
+                return;
+            }
+
+            if (amount < minimumBet) {
+                event.setCancelled(true);
+                Messages.CREATE_MINIMUM_AMOUNT.send(player, "{MIN_BET}", String.format(Locale.US, "%,d", minimumBet));
+                return;
+            }
+
             event.setCancelled(true);
             plugin.getListenerCache().invalidate(uuid);
-            Messages.CHAT_CANCELLED.send(player);
+            game.setAmount(amount);
+
             plugin.getScheduler().runTask(() -> plugin.getInventoryManager().getGameBuilderGUI().openGameBuilderGUI(player, game));
-            return;
         }
+    }
 
-        long amount;
-        try {
-            amount = Long.parseLong(event.getMessage().replace(",", "").replaceAll("\\D", ""));
-        } catch (Exception e) {
+    /**
+     * Spigot handler using AsyncPlayerChatEvent (deprecated on Paper).
+     * Registered only when Paper's event is absent.
+     */
+    private record SpigotHandler(DeluxeCoinflipPlugin plugin) implements Listener {
+
+        // This is marked as deprecated. Given the presence of
+        // this comment, I see no reason to display the warning.
+        @SuppressWarnings("deprecation")
+        @EventHandler(priority = EventPriority.LOWEST)
+        public void onPlayerChat(AsyncPlayerChatEvent event) {
+            final Player player = event.getPlayer();
+            final UUID uuid = player.getUniqueId();
+
+            final CoinflipGame game = plugin.getListenerCache().getIfPresent(uuid);
+            if (game == null) {
+                return;
+            }
+            if (game.isActiveGame()) {
+                return;
+            }
+
+            final String message = event.getMessage().trim();
+
+            if (message.equalsIgnoreCase("cancel")) {
+                event.setCancelled(true);
+                plugin.getListenerCache().invalidate(uuid);
+                Messages.CHAT_CANCELLED.send(player);
+                plugin.getScheduler().runTask(() -> plugin.getInventoryManager().getGameBuilderGUI().openGameBuilderGUI(player, game));
+                return;
+            }
+
+            final long amount;
+            try {
+                final String digits = message.replace(",", "").replaceAll("[^0-9]", "");
+                amount = Long.parseLong(digits);
+            } catch (Exception ex) {
+                event.setCancelled(true);
+                Messages.INVALID_AMOUNT.send(player, "{INPUT}", message.replace(",", ""));
+                return;
+            }
+
+            final FileConfiguration config = plugin.getConfigHandler(ConfigType.CONFIG).getConfig();
+            final long maximumBet = config.getLong("settings.maximum-bet");
+            final long minimumBet = config.getLong("settings.minimum-bet");
+
+            if (amount > maximumBet) {
+                event.setCancelled(true);
+                Messages.CREATE_MAXIMUM_AMOUNT.send(player, "{MAX_BET}", String.format(Locale.US, "%,d", maximumBet));
+                return;
+            }
+
+            if (amount < minimumBet) {
+                event.setCancelled(true);
+                Messages.CREATE_MINIMUM_AMOUNT.send(player, "{MIN_BET}", String.format(Locale.US, "%,d", minimumBet));
+                return;
+            }
+
             event.setCancelled(true);
-            Messages.INVALID_AMOUNT.send(player, "{INPUT}", event.getMessage().replace(",", ""));
-            return;
+            plugin.getListenerCache().invalidate(uuid);
+            game.setAmount(amount);
+
+            plugin.getScheduler().runTask(() -> plugin.getInventoryManager().getGameBuilderGUI().openGameBuilderGUI(player, game)
+            );
         }
-
-        FileConfiguration config = plugin.getConfigHandler(ConfigType.CONFIG).getConfig();
-        String maximumBetFormatted = NumberFormat.getNumberInstance(Locale.US).format(config.getInt("settings.maximum-bet"));
-        String minimumBetFormatted = NumberFormat.getNumberInstance(Locale.US).format(config.getInt("settings.minimum-bet"));
-        if (amount > config.getLong("settings.maximum-bet")) {
-            event.setCancelled(true);
-            Messages.CREATE_MAXIMUM_AMOUNT.send(player, "{MAX_BET}", maximumBetFormatted);
-            return;
-        }
-
-        if (amount < config.getLong("settings.minimum-bet")) {
-            event.setCancelled(true);
-            Messages.CREATE_MINIMUM_AMOUNT.send(player, "{MIN_BET}", minimumBetFormatted);
-            return;
-        }
-
-        event.setCancelled(true);
-        plugin.getListenerCache().invalidate(uuid);
-
-        game.setAmount(amount);
-
-        plugin.getScheduler().runTask(() -> plugin.getInventoryManager().getGameBuilderGUI().openGameBuilderGUI(player, game));
     }
 }

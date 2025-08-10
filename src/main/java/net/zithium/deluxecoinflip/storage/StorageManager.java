@@ -33,10 +33,11 @@ public class StorageManager implements Listener {
     }
 
     public void onEnable() {
-        if (plugin.getConfig().getString("storage.type").equalsIgnoreCase("SQLITE")) {
+        final String configuredType = plugin.getConfig().getString("storage.type");
+        if ("SQLITE".equalsIgnoreCase(configuredType)) {
             storageHandler = new SQLiteHandler();
         } else {
-            throw new InvalidStorageHandlerException("Invalid storage handler specified");
+            throw new InvalidStorageHandlerException("Invalid storage handler specified: " + configuredType);
         }
 
         if (!storageHandler.onEnable(plugin)) {
@@ -50,7 +51,7 @@ public class StorageManager implements Listener {
     }
 
     public void onDisable(boolean shutdown) {
-        if (shutdown) {
+        if (shutdown && storageHandler != null) {
             storageHandler.onDisable();
         }
     }
@@ -81,8 +82,8 @@ public class StorageManager implements Listener {
 
     public void loadPlayerData(UUID uuid) {
         plugin.getScheduler().runTaskAsynchronously(() -> {
-            final PlayerData data = storageHandler.getPlayer(uuid);
-            this.playerDataMap.put(uuid, data);
+            PlayerData data = storageHandler.getPlayer(uuid);
+            playerDataMap.put(uuid, data);
         });
     }
 
@@ -105,12 +106,12 @@ public class StorageManager implements Listener {
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
-    public void onPlayerJoin(final PlayerJoinEvent event) {
+    public void onPlayerJoin(PlayerJoinEvent event) {
         loadPlayerData(event.getPlayer().getUniqueId());
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
-    public void onPlayerQuit(final PlayerQuitEvent event) {
+    public void onPlayerQuit(PlayerQuitEvent event) {
         getPlayer(event.getPlayer().getUniqueId()).ifPresent(data -> savePlayerData(data, true));
     }
 }

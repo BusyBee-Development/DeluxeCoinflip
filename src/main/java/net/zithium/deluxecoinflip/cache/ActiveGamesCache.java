@@ -8,10 +8,11 @@ package net.zithium.deluxecoinflip.cache;
 import net.zithium.deluxecoinflip.game.CoinflipGame;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -25,13 +26,6 @@ public final class ActiveGamesCache {
         return this.activeGames.get(playerUUID);
     }
 
-    public List<UUID> getParticipants(@NotNull CoinflipGame game) {
-        return this.activeGames.entrySet().stream()
-                .filter(e -> e.getValue() == game)
-                .map(Map.Entry::getKey)
-                .collect(Collectors.toList());
-    }
-
     public boolean isInGame(@NotNull UUID playerUUID) {
         return this.activeGames.containsKey(playerUUID);
     }
@@ -40,7 +34,9 @@ public final class ActiveGamesCache {
         final UUID playerId = game.getPlayerUUID();
         final UUID opponentId = game.getOpponentUUID();
 
-        this.activeGames.put(playerId, game);
+        if (playerId != null) {
+            this.activeGames.put(playerId, game);
+        }
 
         if (opponentId != null) {
             this.activeGames.put(opponentId, game);
@@ -48,7 +44,44 @@ public final class ActiveGamesCache {
     }
 
     public void unregister(@NotNull CoinflipGame game) {
-        this.activeGames.entrySet().removeIf(e -> e.getValue() == game);
+        final UUID playerId = game.getPlayerUUID();
+        final UUID opponentId = game.getOpponentUUID();
+
+        boolean removedAny = false;
+
+        if (playerId != null) {
+            removedAny |= this.activeGames.remove(playerId, game);
+        }
+
+        if (opponentId != null) {
+            removedAny |= this.activeGames.remove(opponentId, game);
+        }
+
+        if (!removedAny && (playerId == null || opponentId == null)) {
+            this.activeGames.entrySet().removeIf(e -> e.getValue() == game);
+        }
+    }
+
+    public List<UUID> getParticipants(@NotNull CoinflipGame game) {
+        final UUID a = game.getPlayerUUID();
+        final UUID b = game.getOpponentUUID();
+
+        if (a != null && b != null) {
+            return Arrays.asList(a, b);
+        }
+
+        if (a != null) {
+            return Collections.singletonList(a);
+        }
+
+        if (b != null) {
+            return Collections.singletonList(b);
+        }
+
+        return this.activeGames.entrySet().stream()
+                .filter(e -> e.getValue() == game)
+                .map(java.util.Map.Entry::getKey)
+                .collect(Collectors.toList());
     }
 
     public Collection<CoinflipGame> getAllUniqueGames() {

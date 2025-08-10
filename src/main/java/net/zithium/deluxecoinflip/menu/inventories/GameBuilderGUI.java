@@ -24,6 +24,7 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
 import java.text.NumberFormat;
@@ -43,7 +44,7 @@ public class GameBuilderGUI {
         this.plugin = plugin;
         this.economyManager = plugin.getEconomyManager();
         this.config = plugin.getConfigHandler(ConfigType.CONFIG).getConfig();
-        this.GUI_TITLE = ColorUtil.color(config.getString("gamebuilder-gui.title"));
+        this.GUI_TITLE = ColorUtil.color(config.getString("gamebuilder-gui.title", "&lFLIPPING COIN..."));
         this.BROADCAST_CREATION = config.getBoolean("settings.broadcast-coinflip-creation");
     }
 
@@ -66,11 +67,15 @@ public class GameBuilderGUI {
 
     private void setFillerItems(Gui gui) {
         ConfigurationSection section = config.getConfigurationSection("gamebuilder-gui.filler-items");
-        if (section == null) return;
+        if (section == null) {
+            return;
+        }
 
         for (String key : section.getKeys(false)) {
             ConfigurationSection itemSection = section.getConfigurationSection(key);
-            if (itemSection == null) continue;
+            if (itemSection == null) {
+                continue;
+            }
 
             ItemStack item = ItemStackBuilder.getItemStack(itemSection).build();
             List<Integer> slots = getSlots(itemSection);
@@ -98,7 +103,7 @@ public class GameBuilderGUI {
                     .withLore(getCurrencyLore(section, game))
                     .build();
             guiItem.setItemStack(updated);
-            player.playSound(player.getLocation(), Sound.ENTITY_CHICKEN_EGG, 1L, 0L);
+            player.playSound(player.getLocation(), Sound.ENTITY_CHICKEN_EGG, 1f, 0f);
             gui.update();
         });
 
@@ -113,7 +118,9 @@ public class GameBuilderGUI {
 
         for (String key : section.getKeys(false)) {
             ConfigurationSection itemSection = section.getConfigurationSection(key);
-            if (itemSection == null) continue;
+            if (itemSection == null) {
+                continue;
+            }
 
             ItemStack item = ItemStackBuilder.getItemStack(itemSection).build();
             String setAmount = itemSection.getString("set_amount");
@@ -122,14 +129,17 @@ public class GameBuilderGUI {
             GuiItem guiItem = new GuiItem(item);
             guiItem.setAction(event -> {
                 if (setAmount != null) {
-                    long delta = Long.parseLong(setAmount.replaceAll("[^0-9]", ""));
-                    if (setAmount.startsWith("+")) {
-                        game.setAmount(game.getAmount() + delta);
-                    } else if (setAmount.startsWith("-")) {
-                        game.setAmount(game.getAmount() - delta);
+                    String digits = setAmount.replaceAll("[^0-9]", "");
+                    if (!digits.isEmpty()) {
+                        long delta = Long.parseLong(digits);
+                        if (setAmount.startsWith("+")) {
+                            game.setAmount(game.getAmount() + delta);
+                        } else if (setAmount.startsWith("-")) {
+                            game.setAmount(game.getAmount() - delta);
+                        }
                     }
 
-                    player.playSound(player.getLocation(), Sound.BLOCK_TRIPWIRE_CLICK_ON, 5L, 0L);
+                    player.playSound(player.getLocation(), Sound.BLOCK_TRIPWIRE_CLICK_ON, 1f, 0f);
 
                     ConfigurationSection currencySection = config.getConfigurationSection("gamebuilder-gui.currency-select");
                     if (currencySection != null && currencySection.getBoolean("enabled", true)) {
@@ -159,9 +169,11 @@ public class GameBuilderGUI {
                 event -> {
                     plugin.getScheduler().runTaskAtEntity(player, () -> gui.close(player));
                     plugin.getListenerCache().put(player.getUniqueId(), game);
-                    Messages.ENTER_VALUE_FOR_GAME.send(player,
+                    Messages.ENTER_VALUE_FOR_GAME.send(
+                            player,
                             "{MIN_BET}", TextUtil.numberFormat(config.getLong("settings.minimum-bet")),
-                            "{MAX_BET}", TextUtil.numberFormat(config.getLong("settings.maximum-bet")));
+                            "{MAX_BET}", TextUtil.numberFormat(config.getLong("settings.maximum-bet"))
+                    );
                 });
 
         gui.setItem(section.getInt("slot"), item);
@@ -190,7 +202,7 @@ public class GameBuilderGUI {
                 return;
             }
 
-            if (amount > provider.getBalance(player)) {
+            if (amount > (long) provider.getBalance(player)) {
                 handleError(player, event, "gamebuilder-gui.error-no-funds");
                 return;
             }
@@ -209,30 +221,49 @@ public class GameBuilderGUI {
             String formatted = NumberFormat.getNumberInstance(Locale.US).format(amount);
 
             if (BROADCAST_CREATION) {
-                Messages.COINFLIP_CREATED_BROADCAST.broadcast("{PLAYER}", player.getName(), "{CURRENCY}", provider.getDisplayName(), "{AMOUNT}", formatted);
+                Messages.COINFLIP_CREATED_BROADCAST.broadcast(
+                        "{PLAYER}", player.getName(),
+                        "{CURRENCY}", provider.getDisplayName(),
+                        "{AMOUNT}", formatted
+                );
             }
 
-            Messages.CREATED_GAME.send(player, "{AMOUNT}", formatted, "{CURRENCY}", provider.getDisplayName());
+            Messages.CREATED_GAME.send(
+                    player,
+                    "{AMOUNT}", formatted,
+                    "{CURRENCY}", provider.getDisplayName()
+            );
         });
 
         gui.setItem(section.getInt("slot"), item);
     }
 
     private List<String> getCurrencyLore(ConfigurationSection section, CoinflipGame game) {
-        List<String> lore = new ArrayList<>(section.getStringList("lore-header").stream()
-                .map(line -> line.replace("{BET_AMOUNT}", TextUtil.numberFormat(game.getAmount())))
-                .toList());
+        List<String> lore = new ArrayList<>();
+
+        for (String line : section.getStringList("lore-header")) {
+            if (line != null) {
+                lore.add(line.replace("{BET_AMOUNT}", TextUtil.numberFormat(game.getAmount())));
+            }
+        }
 
         for (EconomyProvider provider : economyManager.getEconomyProviders().values()) {
             String display = provider.getDisplayName();
-            String line = game.getProvider().equalsIgnoreCase(provider.getIdentifier())
+            boolean selected = game.getProvider().equalsIgnoreCase(provider.getIdentifier());
+            String template = selected
                     ? section.getString("currency_lore_selected")
                     : section.getString("currency_lore_unselected");
 
-            lore.add(line.replace("{CURRENCY}", display));
+            if (template != null) {
+                lore.add(template.replace("{CURRENCY}", display));
+            }
         }
 
-        lore.addAll(section.getStringList("lore-footer"));
+        List<String> footer = section.getStringList("lore-footer");
+        if (!footer.isEmpty()) {
+            lore.addAll(footer);
+        }
+
         return lore;
     }
 
@@ -240,7 +271,10 @@ public class GameBuilderGUI {
         List<Integer> slots = new ArrayList<>();
         if (section.contains("slots")) {
             for (String s : section.getStringList("slots")) {
-                slots.add(Integer.parseInt(s));
+                try {
+                    slots.add(Integer.parseInt(s));
+                } catch (NumberFormatException ignored) {
+                }
             }
         } else if (section.contains("slot")) {
             slots.add(section.getInt("slot"));
@@ -258,16 +292,27 @@ public class GameBuilderGUI {
     /**
      * Plays an error sound, temporarily changes the clicked item to an error indicator,
      * and restores it after a delay.
-     *
-     * @param player     The player interacting with the GUI.
-     * @param event      The inventory click event.
-     * @param configPath The configuration path for the error item.
+     * Fixes:
+     * - Guard against null clicked inventory (setItem could NPE).
+     * - Guard against missing config section for the error item.
      */
     private void handleError(Player player, InventoryClickEvent event, String configPath) {
+        Inventory clicked = event.getClickedInventory();
+        if (clicked == null) {
+            return;
+        }
+
         ItemStack original = event.getCurrentItem();
-        player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1L, 0L);
-        event.getClickedInventory().setItem(event.getSlot(),
-                ItemStackBuilder.getItemStack(config.getConfigurationSection(configPath)).build());
-        plugin.getScheduler().runTaskLater(() -> event.getClickedInventory().setItem(event.getSlot(), original), 45L);
+        player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1f, 0f);
+
+        ConfigurationSection errorSection = config.getConfigurationSection(configPath);
+        if (errorSection != null) {
+            clicked.setItem(event.getSlot(), ItemStackBuilder.getItemStack(errorSection).build());
+            plugin.getScheduler().runTaskLater(() -> {
+                if (event.getSlot() >= 0 && event.getSlot() < clicked.getSize()) {
+                    clicked.setItem(event.getSlot(), original);
+                }
+            }, 45L);
+        }
     }
 }

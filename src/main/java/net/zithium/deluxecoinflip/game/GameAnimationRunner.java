@@ -22,6 +22,7 @@ public record GameAnimationRunner(DeluxeCoinflipPlugin plugin) {
 
     public void runAnimation(OfflinePlayer winner, OfflinePlayer loser, CoinflipGame game,
                              Gui winnerGui, Gui loserGui, SecureRandom random) {
+
         final WrappedScheduler scheduler = plugin.getScheduler();
 
         boolean isWinnerGamePlayer = winner.getUniqueId().equals(game.getPlayerUUID());

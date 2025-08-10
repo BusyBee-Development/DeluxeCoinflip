@@ -116,7 +116,10 @@ public class PlayerData {
     }
 
     public double getWinPercentage() {
-        if (wins + losses == 0 || wins == 0) return 0.0;
+        if (wins + losses == 0 || wins == 0) {
+            return 0.0;
+        }
+
         return Double.parseDouble(new DecimalFormat("##.##").format((wins * 100L) / (wins + losses)));
     }
 

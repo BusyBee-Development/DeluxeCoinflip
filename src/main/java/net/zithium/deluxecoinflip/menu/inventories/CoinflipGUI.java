@@ -39,6 +39,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.logging.Level;
 
 public class CoinflipGUI implements Listener {
 
@@ -59,7 +60,7 @@ public class CoinflipGUI implements Listener {
         this.gameAnimationRunner = new GameAnimationRunner(plugin);
 
         // Load config values into variables this helps improve performance.
-        this.coinflipGuiTitle = ColorUtil.color(config.getString("coinflip-gui.title"));
+        this.coinflipGuiTitle = ColorUtil.color(config.getString("coinflip-gui.title", "&lFLIPPING COIN..."));
         this.taxEnabled = config.getBoolean("settings.tax.enabled");
         this.taxRate = config.getDouble("settings.tax.rate");
         this.minimumBroadcastWinnings = config.getLong("settings.minimum-broadcast-winnings");
@@ -68,7 +69,7 @@ public class CoinflipGUI implements Listener {
     public void startGame(@NotNull Player creator, @NotNull Player opponent, CoinflipGame game) {
         // Send the challenge message BEFORE any swapping
         if (opponent.isOnline()) {
-            Messages.PLAYER_CHALLENGE.send(opponent.getPlayer(), "{OPPONENT}", creator.getName());
+            Messages.PLAYER_CHALLENGE.send(opponent, "{OPPONENT}", creator.getName());
         }
 
         game.attachOpponent(opponent.getUniqueId());
@@ -83,11 +84,13 @@ public class CoinflipGUI implements Listener {
         List<Player> players = new ArrayList<>(Arrays.asList(creator, opponent));
         Collections.shuffle(players, random);
 
-        creator = players.get(0).getPlayer();
+        creator = players.get(0);
         opponent = players.get(1);
 
-        OfflinePlayer winner = players.get(random.nextInt(players.size()));
-        OfflinePlayer loser = (winner == creator) ? opponent : creator;
+        // Resolve winner/loser as OfflinePlayer via UUID to avoid null warnings
+        OfflinePlayer winner = Bukkit.getOfflinePlayer(players.get(random.nextInt(players.size())).getUniqueId());
+        OfflinePlayer loser = Bukkit.getOfflinePlayer(winner.getUniqueId().equals(creator.getUniqueId())
+                ? opponent.getUniqueId() : creator.getUniqueId());
 
         // Folia requires that both users have a unique GUI
         Gui winnerGui = createGameGui();
@@ -134,137 +137,137 @@ public class CoinflipGUI implements Listener {
         long winAmount = game.getAmount() * 2L;
         long beforeTax = winAmount / 2L;
 
-        // Re-open if player attempted to exit the menu
-        Runnable ensureOpen = () ->
-            scheduler.runTaskAtEntity(targetPlayer, () -> {
-            if (!targetPlayer.isOnline()) {
-                return;
-            }
-
-            InventoryView view = targetPlayer.getOpenInventory();
-            if (view.getTopInventory() != gui.getInventory()) {
-                try {
-                    gui.open(targetPlayer);
-                } catch (Throwable ignored) {
-                    targetPlayer.openInventory(gui.getInventory());
-                }
-            }
-        });
-
-        Runnable[] task = new Runnable[1];
-        task[0] = () -> {
-            if (!game.isActiveGame()) {
-                scheduler.runTaskLaterAtEntity(targetPlayer, () -> {
-                    if (targetPlayer.isOnline()) {
-                        targetPlayer.closeInventory();
-                    }
-                }, 20L);
-
-                return;
-            }
-
-            // Ensure the GUI remains open
-            ensureOpen.run();
-
-            if (state.count++ >= ANIMATION_COUNT_THRESHOLD) {
-                gui.setItem(13, winnerHead);
-                gui.getFiller().fill(new GuiItem(Material.LIGHT_BLUE_STAINED_GLASS_PANE));
-                gui.disableAllInteractions();
-                gui.update();
-
-                if (targetPlayer.isOnline()) {
-                    targetPlayer.playSound(targetPlayer.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1f, 1f);
+        class AnimationLoop implements Runnable {
+            @Override
+            public void run() {
+                if (!game.isActiveGame()) {
                     scheduler.runTaskLaterAtEntity(targetPlayer, () -> {
                         if (targetPlayer.isOnline()) {
                             targetPlayer.closeInventory();
                         }
                     }, 20L);
-                }
-
-                long taxed = 0L;
-                long finalWinAmount = winAmount;
-                if (taxEnabled) {
-                    taxed = (long) ((taxRate * winAmount) / 100.0);
-                    finalWinAmount -= taxed;
-                }
-
-                if (!game.isActiveGame()) {
                     return;
                 }
 
-                if (isWinnerThread) {
-                    long providedWinAmount = finalWinAmount;
+                // Ensure the GUI remains open
+                ensureGuiOpen(scheduler, targetPlayer, gui);
 
-                    scheduler.runTask(() -> {
-                        if (!game.isActiveGame()) {
-                            return;
+                if (state.count++ >= ANIMATION_COUNT_THRESHOLD) {
+                    gui.setItem(13, winnerHead);
+                    gui.getFiller().fill(new GuiItem(Material.LIGHT_BLUE_STAINED_GLASS_PANE));
+                    gui.disableAllInteractions();
+                    gui.update();
+
+                    if (targetPlayer.isOnline()) {
+                        targetPlayer.playSound(targetPlayer.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1f, 1f);
+                        scheduler.runTaskLaterAtEntity(targetPlayer, () -> {
+                            if (targetPlayer.isOnline()) {
+                                targetPlayer.closeInventory();
+                            }
+                        }, 20L);
+                    }
+
+                    long taxed = 0L;
+                    long finalWinAmount = winAmount;
+                    if (taxEnabled) {
+                        taxed = (long) ((taxRate * winAmount) / 100.0);
+                        finalWinAmount -= taxed;
+                    }
+
+                    if (!game.isActiveGame()) {
+                        return;
+                    }
+
+                    if (isWinnerThread) {
+                        long providedWinAmount = finalWinAmount;
+
+                        scheduler.runTask(() -> {
+                            if (!game.isActiveGame()) {
+                                return;
+                            }
+
+                            economyManager.getEconomyProvider(game.getProvider()).deposit(winner, providedWinAmount);
+                            Bukkit.getPluginManager().callEvent(new CoinflipCompletedEvent(winner, loser, providedWinAmount));
+                            plugin.getGameManager().removeCoinflipGame(game.getPlayerUUID());
+                            plugin.getActiveGamesCache().unregister(game);
+                        });
+
+                        StorageManager storageManager = plugin.getStorageManager();
+                        updatePlayerStats(storageManager, winner, finalWinAmount, beforeTax, true);
+                        updatePlayerStats(storageManager, loser, 0L, beforeTax, false);
+
+                        String winAmountFormatted = TextUtil.numberFormat(finalWinAmount);
+                        String taxedFormatted = TextUtil.numberFormat(taxed);
+                        String providerName = economyManager.getEconomyProvider(game.getProvider()).getDisplayName();
+
+                        if (winner.isOnline()) {
+                            Messages.GAME_SUMMARY_WIN.send(winner.getPlayer(), replacePlaceholders(
+                                    String.valueOf(taxRate), taxedFormatted, winner.getName(), loser.getName(),
+                                    providerName, winAmountFormatted));
                         }
 
-                        economyManager.getEconomyProvider(game.getProvider()).deposit(winner, providedWinAmount);
-                        Bukkit.getPluginManager().callEvent(new CoinflipCompletedEvent(winner, loser, providedWinAmount));
-                        plugin.getGameManager().removeCoinflipGame(game.getPlayerUUID());
-                        plugin.getActiveGamesCache().unregister(game);
-                    });
+                        if (loser.isOnline()) {
+                            Messages.GAME_SUMMARY_LOSS.send(loser.getPlayer(), replacePlaceholders(
+                                    String.valueOf(taxRate), taxedFormatted, winner.getName(), loser.getName(),
+                                    providerName, winAmountFormatted));
+                        }
 
-                    StorageManager storageManager = plugin.getStorageManager();
-                    updatePlayerStats(storageManager, winner, finalWinAmount, beforeTax, true);
-                    updatePlayerStats(storageManager, loser, 0L, beforeTax, false);
-
-                    String winAmountFormatted = TextUtil.numberFormat(finalWinAmount);
-                    String taxedFormatted = TextUtil.numberFormat(taxed);
-                    String providerName = economyManager.getEconomyProvider(game.getProvider()).getDisplayName();
-
-                    if (winner.isOnline()) {
-                        Messages.GAME_SUMMARY_WIN.send(winner.getPlayer(), replacePlaceholders(
-                                String.valueOf(taxRate), taxedFormatted, winner.getName(), loser.getName(),
-                                providerName, winAmountFormatted));
+                        broadcastWinningMessage(finalWinAmount, taxed, winner.getName(), loser.getName(), providerName);
+                        if (config.getBoolean("discord.webhook.enabled", false) || config.getBoolean("discord.bot.enabled", false)) {
+                            plugin.getDiscordHook().executeWebhook(winner, loser, providerName, winAmount)
+                                .exceptionally(ex -> {
+                                    plugin.getLogger().log(Level.SEVERE, "Discord webhook error", ex);
+                                    return null;
+                                });
+                        }
                     }
 
-                    if (loser.isOnline()) {
-                        Messages.GAME_SUMMARY_LOSS.send(loser.getPlayer(), replacePlaceholders(
-                                String.valueOf(taxRate), taxedFormatted, winner.getName(), loser.getName(),
-                                providerName, winAmountFormatted));
-                    }
+                    return;
+                }
 
-                    broadcastWinningMessage(finalWinAmount, taxed, winner.getName(), loser.getName(), providerName);
-                    if (config.getBoolean("discord.webhook.enabled", false) || config.getBoolean("discord.bot.enabled", false)) {
-                        plugin.getDiscordHook().executeWebhook(winner, loser, providerName, winAmount)
-                            .exceptionally(ex -> {
-                                plugin.getLogger().severe("Discord webhook error");
-                                ex.printStackTrace();
-                                return null;
-                            });
+                // Animation tick: first frame random, then alternate head; glass cycles from a random start
+                gui.setItem(13, state.headRandomization ? winnerHead : loserHead);
+
+                ItemStack currentItem = animationItems.get(state.glassIndex).clone();
+                GuiItem filler = new GuiItem(currentItem);
+                for (int i = 0; i < gui.getInventory().getSize(); i++) {
+                    if (i != 13) gui.setItem(i, filler);
+                }
+
+                state.headRandomization = !state.headRandomization;
+                state.glassIndex = (state.glassIndex + 1) % animationItems.size();
+
+                if (targetPlayer.isOnline()) {
+                    targetPlayer.playSound(targetPlayer.getLocation(), Sound.BLOCK_WOODEN_BUTTON_CLICK_ON, 1f, 1f);
+                    if (targetPlayer.getOpenInventory().getTopInventory().equals(gui.getInventory())) {
+                        gui.update();
                     }
                 }
 
+                if (game.isActiveGame()) {
+                    scheduler.runTaskLaterAtEntity(targetPlayer, this, 10L);
+                }
+            }
+        }
+
+        scheduler.runTaskAtEntity(targetPlayer, new AnimationLoop());
+    }
+
+    private void ensureGuiOpen(WrappedScheduler scheduler, Player player, Gui gui) {
+        scheduler.runTaskAtEntity(player, () -> {
+            if (!player.isOnline()) {
                 return;
             }
 
-            // Animation tick: first frame random, then alternate head; glass cycles from a random start
-            gui.setItem(13, state.headRandomization ? winnerHead : loserHead);
-
-            ItemStack currentItem = animationItems.get(state.glassIndex).clone();
-            GuiItem filler = new GuiItem(currentItem);
-            for (int i = 0; i < gui.getInventory().getSize(); i++) {
-                if (i != 13) gui.setItem(i, filler);
-            }
-
-            state.headRandomization = !state.headRandomization;
-            state.glassIndex = (state.glassIndex + 1) % animationItems.size();
-
-            if (targetPlayer.isOnline()) {
-                targetPlayer.playSound(targetPlayer.getLocation(), Sound.BLOCK_WOODEN_BUTTON_CLICK_ON, 1f, 1f);
-                if (targetPlayer.getOpenInventory().getTopInventory().equals(gui.getInventory())) {
-                    gui.update();
+            InventoryView view = player.getOpenInventory();
+            if (view.getTopInventory() != gui.getInventory()) {
+                try {
+                    gui.open(player);
+                } catch (Throwable ignored) {
+                    player.openInventory(gui.getInventory());
                 }
             }
-
-            if (game.isActiveGame()) {
-                scheduler.runTaskLaterAtEntity(targetPlayer, task[0], 10L);
-            }
-        };
-
-        scheduler.runTaskAtEntity(targetPlayer, task[0]);
+        });
     }
 
     private void updatePlayerStats(StorageManager storageManager, OfflinePlayer player, long winAmount, long beforeTax, boolean isWinner) {

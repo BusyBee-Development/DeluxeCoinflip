@@ -12,6 +12,10 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.logging.Level;
 
 public class ConfigHandler {
@@ -33,13 +37,41 @@ public class ConfigHandler {
     }
 
     public void saveDefaultConfig() {
-        if (!this.file.exists()) {
-            int length = this.file.toPath().getNameCount();
-            this.plugin.saveResource(this.file.getParentFile().getName().equals(this.plugin.getName())
-                    ? this.name : this.file.toPath().subpath(length - 2, length).toFile().getPath(), false);
-        }
-
         try {
+            File parent = this.file.getParentFile();
+            if (!parent.exists()) {
+                boolean made = parent.mkdirs();
+                if (!made && !parent.exists()) {
+                    throw new IOException("Failed to create directories for: " + parent.getAbsolutePath());
+                }
+            }
+
+            if (!this.file.exists()) {
+                String relative = toDataFolderRelativePath(this.file, this.plugin.getDataFolder());
+                InputStream res = this.plugin.getResource(relative);
+                if (res != null) {
+                    res.close();
+                    this.plugin.saveResource(relative, false);
+                } else {
+                    boolean created = this.file.createNewFile();
+                    if (!created && !this.file.exists()) {
+                        throw new IOException("Failed to create file: " + this.file.getAbsolutePath());
+                    }
+                }
+            }
+
+            this.configuration = new YamlConfiguration();
+
+            String relative = toDataFolderRelativePath(this.file, this.plugin.getDataFolder());
+            InputStream resForDefaults = this.plugin.getResource(relative);
+            if (resForDefaults != null) {
+                try (InputStreamReader reader = new InputStreamReader(resForDefaults, StandardCharsets.UTF_8)) {
+                    YamlConfiguration defaults = YamlConfiguration.loadConfiguration(reader);
+                    this.configuration.setDefaults(defaults);
+                    this.configuration.options().copyDefaults(true);
+                }
+            }
+
             this.configuration.load(this.file);
         } catch (IOException | InvalidConfigurationException e) {
             this.plugin.getLogger().log(Level.SEVERE, String.format("""
@@ -55,17 +87,31 @@ public class ConfigHandler {
     }
 
     public void save() {
-        if (this.configuration != null && this.file != null) {
-            try {
-                this.getConfig().save(this.file);
-            } catch (IOException e) {
-                this.plugin.getLogger().log(Level.SEVERE, "Error occurred while attempting to save the config.", e);
-            }
+        if (this.configuration == null) {
+            return;
+        }
+
+        try {
+            this.configuration.save(this.file);
+        } catch (IOException e) {
+            this.plugin.getLogger().log(Level.SEVERE, "Error saving configuration '" + this.name + "'.", e);
         }
     }
 
     public void reload() {
         this.configuration = YamlConfiguration.loadConfiguration(this.file);
+
+        String relative = toDataFolderRelativePath(this.file, this.plugin.getDataFolder());
+        InputStream resForDefaults = this.plugin.getResource(relative);
+        if (resForDefaults != null) {
+            try (InputStreamReader reader = new InputStreamReader(resForDefaults, StandardCharsets.UTF_8)) {
+                YamlConfiguration defaults = YamlConfiguration.loadConfiguration(reader);
+                this.configuration.setDefaults(defaults);
+                this.configuration.options().copyDefaults(true);
+            } catch (IOException ignored) {
+                // This marks that the file was successfully read.
+            }
+        }
     }
 
     public FileConfiguration getConfig() {
@@ -74,5 +120,11 @@ public class ConfigHandler {
 
     public File getFile() {
         return this.file;
+    }
+
+    private static String toDataFolderRelativePath(File target, File dataFolder) {
+        Path base = dataFolder.toPath().toAbsolutePath().normalize();
+        Path path = target.toPath().toAbsolutePath().normalize();
+        return base.relativize(path).toString().replace(File.separatorChar, '/');
     }
 }

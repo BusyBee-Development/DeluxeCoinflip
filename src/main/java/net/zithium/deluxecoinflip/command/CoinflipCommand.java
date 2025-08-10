@@ -53,12 +53,12 @@ public class CoinflipCommand extends BaseCommand {
 
     @Default
     public void defaultCommand(final CommandSender sender) {
-        if (!(sender instanceof Player)) {
+        if (!(sender instanceof Player player)) {
             sender.sendMessage("Console cannot open the coinflip GUI, use /coinflip help");
             return;
         }
 
-        plugin.getInventoryManager().getGamesGUI().openInventory((Player) sender);
+        plugin.getInventoryManager().getGamesGUI().openInventory(player);
     }
 
     @Subcommand("reload")
@@ -70,15 +70,25 @@ public class CoinflipCommand extends BaseCommand {
 
     @Subcommand("help")
     public void helpSubCommand(final CommandSender sender) {
-        Messages.HELP_DEFAULT.send(sender, "{PROVIDERS}", economyManager.getEconomyProviders().values().stream().map(p -> p.getDisplayName().toLowerCase()).collect(Collectors.joining(", ")));
-        if (sender.hasPermission("coinflip.admin")) Messages.HELP_ADMIN.send(sender);
+        Messages.HELP_DEFAULT.send(sender, "{PROVIDERS}",
+            economyManager.getEconomyProviders().values().stream()
+                .map(p -> p.getDisplayName().toLowerCase())
+                .collect(Collectors.joining(", ")));
+
+        if (sender.hasPermission("coinflip.admin")) {
+            Messages.HELP_ADMIN.send(sender);
+        }
     }
 
     @Subcommand("about")
     public void aboutSubCommand(final CommandSender sender) {
+        // We are fully aware of this deprecation.
+        @SuppressWarnings("deprecation")
+        final String pluginVersion = plugin.getDescription().getVersion();
+
         sender.sendMessage("");
         sender.sendMessage(ColorUtil.color("&e&lDeluxeCoinflip"));
-        sender.sendMessage(ColorUtil.color("&eVersion: &fv" + plugin.getDescription().getVersion()));
+        sender.sendMessage(ColorUtil.color("&eVersion: &fv" + pluginVersion));
         sender.sendMessage(ColorUtil.color("&eAuthor: &fItzSave"));
 
         if (!TextUtil.isValidDownload()) {
@@ -88,13 +98,14 @@ public class CoinflipCommand extends BaseCommand {
         } else {
             sender.sendMessage(ColorUtil.color("&4Registered to: &chttps://www.spigotmc.org/members/%%__USER__%%/"));
         }
+
         sender.sendMessage("");
     }
 
     @Subcommand("toggle")
     public void toggleSubCommand(final CommandSender sender) {
         if (!(sender instanceof Player player)) {
-            sender.sendMessage("Only players can toggle broadcast messages");
+            sender.sendMessage("Only players can toggle broadcast messages.");
             return;
         }
 
@@ -118,7 +129,7 @@ public class CoinflipCommand extends BaseCommand {
     @Subcommand("delete|remove")
     public void deleteSubCommand(final CommandSender sender) {
         if (!(sender instanceof Player player)) {
-            sender.sendMessage("Only players can remove a coinflip game");
+            sender.sendMessage("Only players can remove a coinflip game.");
             return;
         }
 
@@ -158,7 +169,7 @@ public class CoinflipCommand extends BaseCommand {
         }
 
         if (amount < config.getLong("settings.minimum-bet")) {
-            Messages.CREATE_MINIMUM_AMOUNT.send(player,"{MIN_BET}", TextUtil.numberFormat(config.getLong("settings.minimum-bet")));
+            Messages.CREATE_MINIMUM_AMOUNT.send(player, "{MIN_BET}", TextUtil.numberFormat(config.getLong("settings.minimum-bet")));
             return;
         }
 
@@ -185,7 +196,10 @@ public class CoinflipCommand extends BaseCommand {
         }
 
         if (provider == null) {
-            Messages.INVALID_CURRENCY.send(player,"{CURRENCY_TYPES}", economyManager.getEconomyProviders().values().stream().map(p -> p.getDisplayName().toLowerCase()).collect(Collectors.joining(", ")));
+            Messages.INVALID_CURRENCY.send(player, "{CURRENCY_TYPES}",
+                economyManager.getEconomyProviders().values().stream()
+                    .map(p -> p.getDisplayName().toLowerCase())
+                    .collect(Collectors.joining(", ")));
             return;
         }
 
@@ -194,7 +208,9 @@ public class CoinflipCommand extends BaseCommand {
 
             final CoinflipCreatedEvent event = new CoinflipCreatedEvent(player, coinflipGame);
             Bukkit.getPluginManager().callEvent(event);
-            if(event.isCancelled()) return;
+            if (event.isCancelled()) {
+                return;
+            }
 
             provider.withdraw(player, amount);
             gameManager.addCoinflipGame(player.getUniqueId(), coinflipGame);
@@ -206,13 +222,18 @@ public class CoinflipCommand extends BaseCommand {
                     if (playerDataOptional.isPresent()) {
                         PlayerData playerData = playerDataOptional.get();
                         if (playerData.isDisplayBroadcastMessages()) {
-                            Messages.COINFLIP_CREATED_BROADCAST.send(onlinePlayer, "{PLAYER}", player.getName(), "{CURRENCY}", provider.getDisplayName(), "{AMOUNT}", TextUtil.numberFormat(amount));
+                            Messages.COINFLIP_CREATED_BROADCAST.send(onlinePlayer,
+                                "{PLAYER}", player.getName(),
+                                "{CURRENCY}", provider.getDisplayName(),
+                                "{AMOUNT}", TextUtil.numberFormat(amount));
                         }
                     }
                 });
             }
 
-            Messages.CREATED_GAME.send(player, "{CURRENCY}", provider.getDisplayName(), "{AMOUNT}", TextUtil.numberFormat(amount));
+            Messages.CREATED_GAME.send(player,
+                "{CURRENCY}", provider.getDisplayName(),
+                "{AMOUNT}", TextUtil.numberFormat(amount));
         } else {
             Messages.INSUFFICIENT_FUNDS.send(player);
         }
@@ -220,7 +241,9 @@ public class CoinflipCommand extends BaseCommand {
 
     private EconomyProvider getProviderByName(String name) {
         for (EconomyProvider provider : economyManager.getEconomyProviders().values()) {
-            if (name.equalsIgnoreCase(provider.getDisplayName())) return provider;
+            if (name.equalsIgnoreCase(provider.getDisplayName())) {
+                return provider;
+            }
         }
 
         return null;

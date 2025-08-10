@@ -35,13 +35,21 @@ public class SQLiteHandler implements StorageHandler {
         this.plugin = plugin;
 
         if (!plugin.getDataFolder().exists()) {
-            plugin.getDataFolder().mkdirs();
+            boolean made = plugin.getDataFolder().mkdirs();
+            if (!made && !plugin.getDataFolder().exists()) {
+                plugin.getLogger().severe("Could not create plugin data folder: " + plugin.getDataFolder().getAbsolutePath());
+                return false;
+            }
         }
 
         file = new File(plugin.getDataFolder(), "database.db");
         if (!file.exists()) {
             try {
-                file.createNewFile();
+                boolean created = file.createNewFile();
+                if (!created && !file.exists()) {
+                    plugin.getLogger().severe("Could not create database file: " + file.getAbsolutePath());
+                    return false;
+                }
             } catch (IOException e) {
                 plugin.getLogger().log(Level.SEVERE, "Error occurred while creating the database file.", e);
                 return false;
