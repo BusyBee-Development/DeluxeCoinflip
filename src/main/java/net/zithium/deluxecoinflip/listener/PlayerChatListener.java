@@ -162,8 +162,7 @@ public record PlayerChatListener(DeluxeCoinflipPlugin plugin) implements Listene
             plugin.getListenerCache().invalidate(uuid);
             game.setAmount(amount);
 
-            plugin.getScheduler().runTask(() -> plugin.getInventoryManager().getGameBuilderGUI().openGameBuilderGUI(player, game)
-            );
+            plugin.getScheduler().runTask(() -> plugin.getInventoryManager().getGameBuilderGUI().openGameBuilderGUI(player, game));
         }
     }
 }

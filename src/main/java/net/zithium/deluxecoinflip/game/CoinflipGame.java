@@ -86,8 +86,8 @@ public class CoinflipGame implements Cloneable {
             CoinflipGame copy = (CoinflipGame) super.clone();
             copy.cachedHead = (this.cachedHead != null) ? this.cachedHead.clone() : null;
             return copy;
-        } catch (CloneNotSupportedException e) {
-            throw new AssertionError(e);
+        } catch (CloneNotSupportedException ex) {
+            throw new AssertionError(ex);
         }
     }
 
@@ -112,7 +112,6 @@ public class CoinflipGame implements Cloneable {
         boolean canSchedule = DeluxeCoinflipPlugin.getInstance() != null
                 && DeluxeCoinflipPlugin.getInstance().isEnabled();
 
-        // Creator
         if (creatorOnline != null) {
             if (canSchedule) {
                 DeluxeCoinflipPlugin.getInstance().getScheduler().runTaskLaterAtEntity(creatorOnline, () -> {
@@ -127,7 +126,6 @@ public class CoinflipGame implements Cloneable {
             }
         }
 
-        // Opponent
         if (opponentOnline != null) {
             if (canSchedule) {
                 DeluxeCoinflipPlugin.getInstance().getScheduler().runTaskLaterAtEntity(opponentOnline, () -> {

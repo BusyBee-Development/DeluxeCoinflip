@@ -290,7 +290,6 @@ public class GamesGUI {
         gui.setItem(slot, guiItem);
     }
 
-    // Utilizes a more advanced UnaryOperator for lore replacement
     private ItemStack buildItemWithPlaceholders(ConfigurationSection section,
                                                 UnaryOperator<String> replacement) {
 

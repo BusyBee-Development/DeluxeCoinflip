@@ -70,16 +70,16 @@ public enum Messages {
             return;
         }
 
-        Object raw = config.get(this.path);
+        Object value = config.get(this.path);
 
         String message;
-        if (raw == null) {
+        if (value == null) {
             message = "DeluxeCoinflip: message not found (" + this.path + ")";
-        } else if (raw instanceof List) {
+        } else if (value instanceof List) {
             List<String> lines = config.getStringList(this.path);
             message = TextUtil.fromList(lines);
         } else {
-            message = String.valueOf(raw);
+            message = String.valueOf(value);
         }
 
         if (message == null || message.isEmpty()) {

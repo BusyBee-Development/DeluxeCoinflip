@@ -40,16 +40,16 @@ public record ItemStackBuilder(ItemStack ITEM_STACK) {
 
         final String materialName = Objects.toString(section.getString("material"), "BARRIER").toUpperCase();
         final Material resolved = Material.matchMaterial(materialName);
-        ItemStack working = (resolved != null) ? new ItemStack(resolved) : new ItemStack(Material.BARRIER);
+        ItemStack item = (resolved != null) ? new ItemStack(resolved) : new ItemStack(Material.BARRIER);
 
-        if (working.getType() == Material.PLAYER_HEAD && section.contains("base64")) {
+        if (item.getType() == Material.PLAYER_HEAD && section.contains("base64")) {
             final String base64 = section.getString("base64");
             if (base64 != null && !base64.isEmpty()) {
-                working = Base64Util.getBaseHead(base64).clone();
+                item = Base64Util.getBaseHead(base64).clone();
             }
         }
 
-        ItemStackBuilder builder = new ItemStackBuilder(working);
+        ItemStackBuilder builder = new ItemStackBuilder(item);
 
         if (section.contains("amount")) {
             builder.withAmount(section.getInt("amount"));

@@ -55,7 +55,6 @@ public class GameManager {
             return;
         }
 
-        // Normal path: schedule asynchronously
         plugin.getScheduler().runTaskAsynchronously(() -> {
             try {
                 storageManager.getStorageHandler().deleteCoinflip(uuid);

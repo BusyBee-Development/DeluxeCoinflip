@@ -59,7 +59,6 @@ public class CoinflipGUI implements Listener {
         this.config = plugin.getConfigHandler(ConfigType.CONFIG).getConfig();
         this.gameAnimationRunner = new GameAnimationRunner(plugin);
 
-        // Load config values into variables this helps improve performance.
         this.coinflipGuiTitle = ColorUtil.color(config.getString("coinflip-gui.title", "&lFLIPPING COIN..."));
         this.taxEnabled = config.getBoolean("settings.tax.enabled");
         this.taxRate = config.getDouble("settings.tax.rate");
@@ -67,7 +66,6 @@ public class CoinflipGUI implements Listener {
     }
 
     public void startGame(@NotNull Player creator, @NotNull Player opponent, CoinflipGame game) {
-        // Send the challenge message BEFORE any swapping
         if (opponent.isOnline()) {
             Messages.PLAYER_CHALLENGE.send(opponent, "{OPPONENT}", creator.getName());
         }
@@ -76,23 +74,19 @@ public class CoinflipGUI implements Listener {
         game.setActiveGame(true);
         DeluxeCoinflipPlugin.getInstance().getActiveGamesCache().register(game);
 
-        // SecureRandom for better randomness
         SecureRandom random = new SecureRandom();
         random.setSeed(System.nanoTime() + creator.getUniqueId().hashCode() + opponent.getUniqueId().hashCode());
 
-        // Randomly shuffle player order
         List<Player> players = new ArrayList<>(Arrays.asList(creator, opponent));
         Collections.shuffle(players, random);
 
         creator = players.get(0);
         opponent = players.get(1);
 
-        // Resolve winner/loser as OfflinePlayer via UUID to avoid null warnings
         OfflinePlayer winner = Bukkit.getOfflinePlayer(players.get(random.nextInt(players.size())).getUniqueId());
         OfflinePlayer loser = Bukkit.getOfflinePlayer(winner.getUniqueId().equals(creator.getUniqueId())
                 ? opponent.getUniqueId() : creator.getUniqueId());
 
-        // Folia requires that both users have a unique GUI
         Gui winnerGui = createGameGui();
         Gui loserGui = createGameGui();
 
@@ -149,7 +143,6 @@ public class CoinflipGUI implements Listener {
                     return;
                 }
 
-                // Ensure the GUI remains open
                 ensureGuiOpen(scheduler, targetPlayer, gui);
 
                 if (state.count++ >= ANIMATION_COUNT_THRESHOLD) {
@@ -225,7 +218,6 @@ public class CoinflipGUI implements Listener {
                     return;
                 }
 
-                // Animation tick: first frame random, then alternate head; glass cycles from a random start
                 gui.setItem(13, state.headRandomization ? winnerHead : loserHead);
 
                 ItemStack currentItem = animationItems.get(state.glassIndex).clone();

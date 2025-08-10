@@ -50,13 +50,13 @@ public final class TextUtil {
 
         StringBuilder out = new StringBuilder();
         for (int i = 0; i < lines.size(); i++) {
-            String raw = Objects.toString(lines.get(i), "");
-            String stripped = stripLegacyColors(raw);
+            String original = Objects.toString(lines.get(i), "");
+            String stripped = stripLegacyColors(original);
 
             if (stripped.isEmpty()) {
                 out.append("\n&r");
             } else {
-                out.append(raw);
+                out.append(original);
                 if (i + 1 < lines.size()) {
                     out.append("\n");
                 }
