@@ -50,7 +50,7 @@ public record GameQuitListener(DeluxeCoinflipPlugin plugin) implements Listener 
         }
 
         // Remove the game from storage and listing
-        this.plugin.getStorageManager().getStorageHandler().deleteCoinfip(game.getPlayerUUID());
+        this.plugin.getStorageManager().getStorageHandler().deleteCoinflip(game.getPlayerUUID());
         this.plugin.getGameManager().removeCoinflipGame(game.getPlayerUUID());
     }
 }

@@ -49,17 +49,18 @@ public class GameManager {
         // If the plugin is disabled (e.g., during onDisable), DON'T schedule - run inline
         if (!plugin.isEnabled()) {
             try {
-                storageManager.getStorageHandler().deleteCoinfip(uuid);
+                storageManager.getStorageHandler().deleteCoinflip(uuid);
             } catch (Exception ex) {
                 plugin.getLogger().warning("Failed to delete coinflip for " + uuid + " during shutdown: " + ex.getMessage());
             }
+
             return;
         }
 
         // Normal path: schedule asynchronously
         plugin.getScheduler().runTaskAsynchronously(() -> {
             try {
-                storageManager.getStorageHandler().deleteCoinfip(uuid);
+                storageManager.getStorageHandler().deleteCoinflip(uuid);
             } catch (Exception ex) {
                 plugin.getLogger().warning("Failed to delete coinflip for " + uuid + ": " + ex.getMessage());
             }

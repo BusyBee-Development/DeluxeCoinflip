@@ -70,7 +70,7 @@ public final class GameShutdownUtil {
 
             // Clean listing/storage by creator
             plugin.getGameManager().removeCoinflipGame(game.getPlayerUUID());
-            plugin.getStorageManager().getStorageHandler().deleteCoinfip(game.getPlayerUUID());
+            plugin.getStorageManager().getStorageHandler().deleteCoinflip(game.getPlayerUUID());
         }
 
         cache.clear();
@@ -105,7 +105,7 @@ public final class GameShutdownUtil {
 
             // Remove listing + storage
             plugin.getGameManager().removeCoinflipGame(creatorId);
-            plugin.getStorageManager().getStorageHandler().deleteCoinfip(creatorId);
+            plugin.getStorageManager().getStorageHandler().deleteCoinflip(creatorId);
         }
     }
 }

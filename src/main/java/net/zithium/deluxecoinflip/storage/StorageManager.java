@@ -16,13 +16,12 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.Stream;
+import java.util.concurrent.ConcurrentHashMap;
 
-public class StorageManager {
+public class StorageManager implements Listener {
 
     private final DeluxeCoinflipPlugin plugin;
     private final Map<UUID, PlayerData> playerDataMap;
@@ -30,7 +29,7 @@ public class StorageManager {
 
     public StorageManager(DeluxeCoinflipPlugin plugin) {
         this.plugin = plugin;
-        this.playerDataMap = new HashMap<>();
+        this.playerDataMap = new ConcurrentHashMap<>();
     }
 
     public void onEnable() {
@@ -45,21 +44,7 @@ public class StorageManager {
             return;
         }
 
-        Stream.of(
-                new Listener() {
-                    @EventHandler(priority = EventPriority.MONITOR)
-                    public void onPlayerJoin(final PlayerJoinEvent event) {
-                        loadPlayerData(event.getPlayer().getUniqueId());
-                    }
-                },
-
-                new Listener() {
-                    @EventHandler(priority = EventPriority.MONITOR)
-                    public void onPlayerQuit(final PlayerQuitEvent event) {
-                        getPlayer(event.getPlayer().getUniqueId()).ifPresent(data -> savePlayerData(data, true));
-                    }
-                }
-        ).forEach(listener -> plugin.getServer().getPluginManager().registerEvents(listener, plugin));
+        plugin.getServer().getPluginManager().registerEvents(this, plugin);
 
         Bukkit.getOnlinePlayers().forEach(player -> loadPlayerData(player.getUniqueId()));
     }
@@ -75,19 +60,23 @@ public class StorageManager {
     }
 
     public void updateOfflinePlayerWin(UUID uuid, long profit, long beforeTax) {
-        PlayerData playerData = storageHandler.getPlayer(uuid);
-        playerData.updateWins();
-        playerData.updateProfit(profit);
-        playerData.updateGambled(beforeTax);
-        savePlayerData(playerData, false);
+        plugin.getScheduler().runTaskAsynchronously(() -> {
+            PlayerData playerData = storageHandler.getPlayer(uuid);
+            playerData.updateWins();
+            playerData.updateProfit(profit);
+            playerData.updateGambled(beforeTax);
+            storageHandler.savePlayer(playerData);
+        });
     }
 
     public void updateOfflinePlayerLoss(UUID uuid, long beforeTax) {
-        PlayerData playerData = storageHandler.getPlayer(uuid);
-        playerData.updateLosses();
-        playerData.updateLosses(beforeTax);
-        playerData.updateGambled(beforeTax);
-        savePlayerData(playerData, false);
+        plugin.getScheduler().runTaskAsynchronously(() -> {
+            PlayerData playerData = storageHandler.getPlayer(uuid);
+            playerData.updateLosses();
+            playerData.updateLosses(beforeTax);
+            playerData.updateGambled(beforeTax);
+            storageHandler.savePlayer(playerData);
+        });
     }
 
     public void loadPlayerData(UUID uuid) {
@@ -113,5 +102,15 @@ public class StorageManager {
 
     public StorageHandler getStorageHandler() {
         return storageHandler;
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onPlayerJoin(final PlayerJoinEvent event) {
+        loadPlayerData(event.getPlayer().getUniqueId());
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onPlayerQuit(final PlayerQuitEvent event) {
+        getPlayer(event.getPlayer().getUniqueId()).ifPresent(data -> savePlayerData(data, true));
     }
 }

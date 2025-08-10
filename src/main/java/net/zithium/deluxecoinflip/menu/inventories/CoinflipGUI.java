@@ -106,20 +106,26 @@ public class CoinflipGUI implements Listener {
                                OfflinePlayer winner, OfflinePlayer loser, CoinflipGame game,
                                Player targetPlayer, SecureRandom random, boolean isWinnerThread) {
 
-        ConfigurationSection animationConfig1 = plugin.getConfig().getConfigurationSection("coinflip-gui.animation.1");
-        ConfigurationSection animationConfig2 = plugin.getConfig().getConfigurationSection("coinflip-gui.animation.2");
+        List<ItemStack> animationItems = new ArrayList<>();
+        ConfigurationSection animationSection = plugin.getConfig().getConfigurationSection("coinflip-gui.animation");
+        if (animationSection != null) {
+            for (String key : animationSection.getKeys(false)) {
+                ConfigurationSection animationConfig = animationSection.getConfigurationSection(key);
+                if (animationConfig != null) {
+                    ItemStack item = ItemStackBuilder.getItemStack(animationConfig).build();
+                    animationItems.add(item);
+                }
+            }
+        }
 
-        ItemStack firstAnimationItem = (animationConfig1 != null)
-                ? ItemStackBuilder.getItemStack(animationConfig1).build()
-                : new ItemStack(Material.YELLOW_STAINED_GLASS_PANE);
-
-        ItemStack secondAnimationItem = (animationConfig2 != null)
-                ? ItemStackBuilder.getItemStack(animationConfig2).build()
-                : new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
+        if (animationItems.isEmpty()) {
+            animationItems.add(new ItemStack(Material.YELLOW_STAINED_GLASS_PANE));
+            animationItems.add(new ItemStack(Material.GRAY_STAINED_GLASS_PANE));
+        }
 
         class AnimationState {
             boolean headRandomization = random.nextBoolean();
-            boolean glassRandomization = random.nextBoolean();
+            int glassIndex = random.nextInt(animationItems.size());
             int count = 0;
         }
 
@@ -234,15 +240,17 @@ public class CoinflipGUI implements Listener {
                 return;
             }
 
-            // Animation tick: alternate, but with random first frame
+            // Animation tick: first frame random, then alternate head; glass cycles from a random start
             gui.setItem(13, state.headRandomization ? winnerHead : loserHead);
-            GuiItem filler = new GuiItem((state.glassRandomization ? firstAnimationItem : secondAnimationItem).clone());
+
+            ItemStack currentItem = animationItems.get(state.glassIndex).clone();
+            GuiItem filler = new GuiItem(currentItem);
             for (int i = 0; i < gui.getInventory().getSize(); i++) {
                 if (i != 13) gui.setItem(i, filler);
             }
 
             state.headRandomization = !state.headRandomization;
-            state.glassRandomization = !state.glassRandomization;
+            state.glassIndex = (state.glassIndex + 1) % animationItems.size();
 
             if (targetPlayer.isOnline()) {
                 targetPlayer.playSound(targetPlayer.getLocation(), Sound.BLOCK_WOODEN_BUTTON_CLICK_ON, 1f, 1f);
