@@ -230,6 +230,7 @@ public class CoinflipGUI implements Listener {
                             });
                     }
                 }
+
                 return;
             }
 
