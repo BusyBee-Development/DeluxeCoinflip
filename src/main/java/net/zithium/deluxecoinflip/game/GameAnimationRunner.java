@@ -16,10 +16,12 @@ import org.bukkit.Material;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
+import java.security.SecureRandom;
 
 public record GameAnimationRunner(DeluxeCoinflipPlugin plugin) {
 
-    public void runAnimation(OfflinePlayer winner, OfflinePlayer loser, CoinflipGame game, Gui winnerGui, Gui loserGui) {
+    public void runAnimation(OfflinePlayer winner, OfflinePlayer loser, CoinflipGame game,
+                             Gui winnerGui, Gui loserGui, SecureRandom random) {
         final WrappedScheduler scheduler = plugin.getScheduler();
 
         boolean isWinnerGamePlayer = winner.getUniqueId().equals(game.getPlayerUUID());
@@ -47,7 +49,7 @@ public record GameAnimationRunner(DeluxeCoinflipPlugin plugin) {
                 winnerGui.open(winnerPlayer);
                 plugin.getInventoryManager().getCoinflipGUI().startAnimation(
                     scheduler, winnerGui, winnerHead, loserHead,
-                    winner, loser, game, winnerPlayer, true);
+                    winner, loser, game, winnerPlayer, random, true);
             });
         }
 
@@ -56,7 +58,7 @@ public record GameAnimationRunner(DeluxeCoinflipPlugin plugin) {
                 loserGui.open(loserPlayer);
                 plugin.getInventoryManager().getCoinflipGUI().startAnimation(
                     scheduler, loserGui, winnerHead, loserHead,
-                    winner, loser, game, loserPlayer, false);
+                    winner, loser, game, loserPlayer, random, false);
             });
         }
     }

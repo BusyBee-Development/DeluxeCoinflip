@@ -39,7 +39,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.ThreadLocalRandom;
 
 public class CoinflipGUI implements Listener {
 
@@ -94,7 +93,7 @@ public class CoinflipGUI implements Listener {
         Gui winnerGui = createGameGui();
         Gui loserGui = createGameGui();
 
-        this.gameAnimationRunner.runAnimation(winner, loser, game, winnerGui, loserGui);
+        this.gameAnimationRunner.runAnimation(winner, loser, game, winnerGui, loserGui, random);
     }
 
     private Gui createGameGui() {
@@ -105,7 +104,7 @@ public class CoinflipGUI implements Listener {
 
     public void startAnimation(WrappedScheduler scheduler, Gui gui, GuiItem winnerHead, GuiItem loserHead,
                                OfflinePlayer winner, OfflinePlayer loser, CoinflipGame game,
-                               Player targetPlayer, boolean isWinnerThread) {
+                               Player targetPlayer, SecureRandom random, boolean isWinnerThread) {
 
         ConfigurationSection animationConfig1 = plugin.getConfig().getConfigurationSection("coinflip-gui.animation.1");
         ConfigurationSection animationConfig2 = plugin.getConfig().getConfigurationSection("coinflip-gui.animation.2");
@@ -119,7 +118,7 @@ public class CoinflipGUI implements Listener {
                 : new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
 
         class AnimationState {
-            boolean alternate = ThreadLocalRandom.current().nextBoolean();
+            boolean alternate = random.nextBoolean();
             int count = 0;
         }
 
