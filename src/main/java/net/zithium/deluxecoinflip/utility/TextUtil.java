@@ -145,6 +145,7 @@ public final class TextUtil {
             } else {
                 break;
             }
+
             i++;
         }
 
