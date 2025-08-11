@@ -37,7 +37,7 @@ public record GameQuitListener(DeluxeCoinflipPlugin plugin) implements Listener 
         final EconomyManager economyManager = plugin.getEconomyManager();
         final EconomyProvider economyProvider = economyManager.getEconomyProvider(game.getProvider());
         if (economyProvider == null) {
-            plugin.getLogger().warning("[Coinflip] Missing economy provider '" + game.getProvider() + "'; refund skipped for " + quitter.getName() + ".");
+            plugin.getLogger().warning("[DeluxeCoinflip] Missing economy provider '" + game.getProvider() + "'; refund skipped for " + quitter.getName() + ".");
             plugin.getStorageManager().getStorageHandler().deleteCoinflip(game.getPlayerUUID());
             plugin.getGameManager().removeCoinflipGame(game.getPlayerUUID());
             return;

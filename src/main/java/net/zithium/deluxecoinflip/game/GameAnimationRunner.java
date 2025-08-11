@@ -92,6 +92,7 @@ public record GameAnimationRunner(DeluxeCoinflipPlugin plugin) {
                 for (Object element : listValue) {
                     replaced.add(String.valueOf(element).replace("{PLAYER}", safeName(player)));
                 }
+
                 resolved.set(key, replaced);
             } else {
                 resolved.set(key, value);
