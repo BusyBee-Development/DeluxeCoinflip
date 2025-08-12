@@ -179,13 +179,13 @@ public final class TextUtil {
             return null;
         }
 
-        final String sArg = input.trim();
-        if (sArg.isEmpty()) {
+        final String rawInput = input.trim();
+        if (rawInput.isEmpty()) {
             return null;
         }
 
-        final String sanitized = sArg.replaceAll("[^0-9.,]", "");
-        final String remainder = sArg.replace(sanitized, "").toUpperCase(Locale.ROOT);
+        final String sanitized = rawInput.replaceAll("[^0-9.,]", "");
+        final String remainder = rawInput.replace(sanitized, "").toUpperCase(Locale.ROOT);
 
         BigDecimal multiplier = null;
         switch (remainder) {
