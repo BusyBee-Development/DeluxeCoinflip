@@ -350,13 +350,13 @@ public class GamesGUI {
 
     private void playConfiguredSound(Player player) {
         FileConfiguration cfg = plugin.getConfigHandler(ConfigType.CONFIG).getConfig();
-        ConfigurationSection s = cfg.getConfigurationSection("games-gui.sounds.error_no_funds");
+        ConfigurationSection section = cfg.getConfigurationSection("games-gui.sounds.error_no_funds");
 
-        if (s == null || !s.getBoolean("enabled", true)) {
+        if (section == null || !section.getBoolean("enabled", true)) {
             return;
         }
 
-        String name = s.getString("name", Sound.BLOCK_NOTE_BLOCK_PLING.name());
+        String name = section.getString("name", Sound.BLOCK_NOTE_BLOCK_PLING.name());
         Sound chosen;
         try {
             chosen = Sound.valueOf(name.toUpperCase());
@@ -364,8 +364,8 @@ public class GamesGUI {
             chosen = Sound.BLOCK_NOTE_BLOCK_PLING;
         }
 
-        float vol = (float) s.getDouble("volume", (float) 1.0);
-        float pitch = (float) s.getDouble("pitch", (float) 0.0);
+        float vol = (float) section.getDouble("volume", (float) 1.0);
+        float pitch = (float) section.getDouble("pitch", (float) 0.0);
         player.playSound(player.getLocation(), chosen, vol, pitch);
     }
 }

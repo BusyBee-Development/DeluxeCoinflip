@@ -3,16 +3,16 @@
  * Copyright (c) 2021 - 2025 Zithium Studios. All rights reserved.
  */
 
-package net.zithium.deluxecoinflip.storage.handler;
+package net.zithium.deluxecoinflip.storage.handler.impl;
 
 import net.zithium.deluxecoinflip.DeluxeCoinflipPlugin;
 import net.zithium.deluxecoinflip.cache.ActiveGamesCache;
 import net.zithium.deluxecoinflip.config.Messages;
 import net.zithium.deluxecoinflip.economy.provider.EconomyProvider;
 import net.zithium.deluxecoinflip.game.CoinflipGame;
+import net.zithium.deluxecoinflip.storage.handler.GameShutdownProvider;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
-import org.jetbrains.annotations.NotNull;
 
 import java.text.NumberFormat;
 import java.util.ArrayList;
@@ -24,17 +24,16 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-public final class GameShutdownHandler {
+public record DefaultGameShutdownProvider(DeluxeCoinflipPlugin plugin) implements GameShutdownProvider {
 
-    public static void shutdownAll(@NotNull DeluxeCoinflipPlugin plugin) {
-        shutdownActiveGames(plugin);
-        shutdownNonActiveListings(plugin);
+    @Override
+    public void shutdownAll() {
+        shutdownActiveGames();
+        shutdownNonActiveListings();
     }
 
-    /**
-     * Handle ACTIVE games: stop animations and refund BOTH participants.
-     */
-    public static void shutdownActiveGames(@NotNull DeluxeCoinflipPlugin plugin) {
+    @Override
+    public void shutdownActiveGames() {
         final ActiveGamesCache activeCache = plugin.getActiveGamesCache();
 
         final Collection<CoinflipGame> activeGames = new LinkedHashSet<>(activeCache.getAllUniqueGames());
@@ -52,7 +51,7 @@ public final class GameShutdownHandler {
 
             final EconomyProvider provider = plugin.getEconomyManager().getEconomyProvider(game.getProvider());
             if (provider == null) {
-                removeListingAndStorage(plugin, game.getPlayerUUID());
+                removeListingAndStorage(game.getPlayerUUID());
                 continue;
             }
 
@@ -60,19 +59,17 @@ public final class GameShutdownHandler {
             final String amountFormatted = NumberFormat.getNumberInstance(Locale.US).format(amount);
 
             for (UUID participantId : participants) {
-                refundPlayer(plugin, provider, participantId, amount, amountFormatted, game.getProvider());
+                refundPlayer(provider, participantId, amount, amountFormatted, game.getProvider());
             }
 
-            removeListingAndStorage(plugin, game.getPlayerUUID());
+            removeListingAndStorage(game.getPlayerUUID());
         }
 
         activeCache.clear();
     }
 
-    /**
-     * Handle NON-ACTIVE listings: refund CREATOR only using GameManager (not the active cache).
-     */
-    public static void shutdownNonActiveListings(@NotNull DeluxeCoinflipPlugin plugin) {
+    @Override
+    public void shutdownNonActiveListings() {
 
         final Map<UUID, CoinflipGame> listings = plugin.getGameManager().getCoinflipGames();
         final List<CoinflipGame> snapshot = new ArrayList<>(listings.values());
@@ -89,19 +86,19 @@ public final class GameShutdownHandler {
 
             final EconomyProvider provider = plugin.getEconomyManager().getEconomyProvider(game.getProvider());
             if (provider == null) {
-                removeListingAndStorage(plugin, creatorId);
+                removeListingAndStorage(creatorId);
                 continue;
             }
 
             final long amount = game.getAmount();
             final String amountFormatted = NumberFormat.getNumberInstance(Locale.US).format(amount);
 
-            refundPlayer(plugin, provider, creatorId, amount, amountFormatted, game.getProvider());
-            removeListingAndStorage(plugin, creatorId);
+            refundPlayer(provider, creatorId, amount, amountFormatted, game.getProvider());
+            removeListingAndStorage(creatorId);
         }
     }
 
-    private static Set<UUID> collectParticipants(ActiveGamesCache cache, CoinflipGame game) {
+    private Set<UUID> collectParticipants(ActiveGamesCache cache, CoinflipGame game) {
         final Set<UUID> participants = new LinkedHashSet<>(cache.getParticipants(game));
 
         final UUID creatorId = game.getPlayerUUID();
@@ -117,8 +114,8 @@ public final class GameShutdownHandler {
         return participants;
     }
 
-    private static void refundPlayer(DeluxeCoinflipPlugin plugin, EconomyProvider provider, UUID playerId,
-                                     long amount, String amountFormatted, String providerIdentifier) {
+    private void refundPlayer(EconomyProvider provider, UUID playerId,
+                              long amount, String amountFormatted, String providerIdentifier) {
 
         if (playerId == null) {
             return;
@@ -133,7 +130,7 @@ public final class GameShutdownHandler {
         provider.deposit(offline, amount);
     }
 
-    private static void removeListingAndStorage(DeluxeCoinflipPlugin plugin, UUID creatorId) {
+    private void removeListingAndStorage(UUID creatorId) {
         if (creatorId == null) {
             return;
         }

@@ -87,6 +87,7 @@ public class SQLiteHandler implements StorageHandler {
                     preparedStatement.setBoolean(7, player.isDisplayBroadcastMessages());
                     preparedStatement.addBatch();
                 }
+
                 preparedStatement.executeBatch();
             }
             c.commit();
@@ -99,7 +100,7 @@ public class SQLiteHandler implements StorageHandler {
 
     public Connection getConnection() {
         try {
-            return DriverManager.getConnection("jdbc:sqlite:" + file);
+            return DriverManager.getConnection("jdbc:sqlite:" + file.getAbsolutePath());
         } catch (SQLException ex) {
             plugin.getLogger().log(Level.SEVERE, "Error occurred while setting up the database connection.", ex);
             throw new IllegalStateException("Unable to open SQLite connection", ex);
@@ -222,21 +223,22 @@ public class SQLiteHandler implements StorageHandler {
 
     @Override
     public CoinflipGame getCoinflipGame(@NotNull UUID uuid) {
-        final String SQL = "SELECT * FROM games WHERE uuid = ?;";
-        try (Connection GAME_CONNECTION = getConnection();
-             PreparedStatement preparedStatement = GAME_CONNECTION.prepareStatement(SQL)) {
+        final String sql = "SELECT provider, amount FROM games WHERE uuid = ?;";
+        try (Connection gameConnection = getConnection();
+             PreparedStatement preparedStatement = gameConnection.prepareStatement(sql)) {
             preparedStatement.setString(1, uuid.toString());
             try (ResultSet resultSet = preparedStatement.executeQuery()) {
-                if (resultSet.next()) {
-                    String provider = resultSet.getString("provider");
-                    long amount = resultSet.getLong("amount");
-                    return new CoinflipGame(uuid, provider, amount);
+                if (!resultSet.next()) {
+                    return null;
                 }
+
+                final String provider = resultSet.getString("provider");
+                final long amount = resultSet.getLong("amount");
+                return new CoinflipGame(uuid, provider, amount);
             }
         } catch (SQLException e) {
             plugin.getLogger().log(Level.SEVERE, "Error occurred while attempting to get a coinflip game.", e);
+            return null;
         }
-
-        return null;
     }
 }

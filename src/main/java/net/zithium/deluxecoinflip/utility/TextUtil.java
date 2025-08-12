@@ -18,21 +18,32 @@ public final class TextUtil {
 
     private static final String[] SUFFIXES = {"", "k", "M", "B", "T"};
     private static final int SHORT_MAX_LEN = 5;
-    private static final NumberFormat NUMBER_FORMAT = NumberFormat.getNumberInstance(Locale.US);
+
+    private static final ThreadLocal<DecimalFormat> SHORT_DF =
+            ThreadLocal.withInitial(() -> new DecimalFormat("##0E0"));
+    private static final ThreadLocal<NumberFormat> NUMBER_FORMAT =
+            ThreadLocal.withInitial(() -> NumberFormat.getNumberInstance(Locale.US));
 
     private static final Pattern COLOR_SIMPLE      = Pattern.compile("(?i)(?<!&r|§r)([&§][0-9a-f])");
     private static final Pattern COLOR_HEX_HASH    = Pattern.compile("(?i)(?<!&r|§r)&#([0-9a-f]{6})");
     private static final Pattern COLOR_HEX_SECTION = Pattern.compile("(?i)(?<!&r|§r)([&§]x(?:[&§][0-9a-f]){6})");
 
+    private static final Pattern EXPONENT_SUFFIX      = Pattern.compile("E\\d");
+    private static final Pattern DECIMAL_TRAIL_MATCH  = Pattern.compile("\\d+\\.[a-zA-Z]");
+    private static final Pattern RESET_DUPES          = Pattern.compile("(?i)(?:[&§]r){2,}");
+    private static final Pattern STRIP_LEGACY_SIMPLE  = Pattern.compile("(?i)[§&][0-9A-FK-OR]");
+    private static final Pattern STRIP_HEX_HASH       = Pattern.compile("(?i)&#[0-9A-F]{6}");
+    private static final Pattern STRIP_HEX_SECTION    = Pattern.compile("(?i)[§&]x(?:[§&][0-9A-F]){6}");
+
     private static final char NBSP = '\u00A0';
 
     public static String format(double number) {
-        String repr = new DecimalFormat("##0E0").format(number);
+        String repr = SHORT_DF.get().format(number);
         int expDigit = Character.getNumericValue(repr.charAt(repr.length() - 1));
         int suffixIndex = Math.max(0, Math.min(expDigit / 3, SUFFIXES.length - 1));
-        repr = repr.replaceAll("E\\d", SUFFIXES[suffixIndex]);
+        repr = EXPONENT_SUFFIX.matcher(repr).replaceAll(SUFFIXES[suffixIndex]);
 
-        while (repr.length() > SHORT_MAX_LEN || repr.matches("\\d+\\.[a-zA-Z]")) {
+        while (repr.length() > SHORT_MAX_LEN || DECIMAL_TRAIL_MATCH.matcher(repr).matches()) {
             repr = repr.substring(0, repr.length() - 2) + repr.substring(repr.length() - 1);
         }
 
@@ -40,7 +51,7 @@ public final class TextUtil {
     }
 
     public static String numberFormat(long amount) {
-        return NUMBER_FORMAT.format(amount);
+        return NUMBER_FORMAT.get().format(amount);
     }
 
     public static String color(String input) {
@@ -115,7 +126,7 @@ public final class TextUtil {
         String out = COLOR_SIMPLE.matcher(input).replaceAll("&r$1");
         out = COLOR_HEX_HASH.matcher(out).replaceAll("&r&#$1");
         out = COLOR_HEX_SECTION.matcher(out).replaceAll("&r$1");
-        return out.replaceAll("(?i)(?:[&§]r){2,}", "&r");
+        return RESET_DUPES.matcher(out).replaceAll("&r");
     }
 
     private static String stripLegacyColors(String input) {
@@ -123,9 +134,9 @@ public final class TextUtil {
             return "";
         }
 
-        String out = input.replaceAll("(?i)[§&][0-9A-FK-OR]", "");
-        out = out.replaceAll("(?i)&#[0-9A-F]{6}", "");
-        out = out.replaceAll("(?i)[§&]x(?:[§&][0-9A-F]){6}", "");
+        String out = STRIP_LEGACY_SIMPLE.matcher(input).replaceAll("");
+        out = STRIP_HEX_HASH.matcher(out).replaceAll("");
+        out = STRIP_HEX_SECTION.matcher(out).replaceAll("");
         return out;
     }
 

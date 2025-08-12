@@ -28,7 +28,8 @@ import net.zithium.deluxecoinflip.menu.DupeProtection;
 import net.zithium.deluxecoinflip.menu.InventoryManager;
 import net.zithium.deluxecoinflip.storage.PlayerData;
 import net.zithium.deluxecoinflip.storage.StorageManager;
-import net.zithium.deluxecoinflip.storage.handler.GameShutdownHandler;
+import net.zithium.deluxecoinflip.storage.handler.GameShutdownProvider;
+import net.zithium.deluxecoinflip.storage.handler.impl.DefaultGameShutdownProvider;
 import net.zithium.deluxecoinflip.utility.ItemStackBuilder;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
@@ -50,6 +51,10 @@ public class DeluxeCoinflipPlugin extends FoliaWrappedJavaPlugin implements Delu
 
     private static DeluxeCoinflipPlugin instance;
 
+    public static DeluxeCoinflipPlugin getInstance() {
+        return instance;
+    }
+
     private Map<ConfigType, ConfigHandler> configMap;
     private StorageManager storageManager;
     private GameManager gameManager;
@@ -60,9 +65,7 @@ public class DeluxeCoinflipPlugin extends FoliaWrappedJavaPlugin implements Delu
 
     private Cache<UUID, CoinflipGame> listenerCache;
 
-    public static DeluxeCoinflipPlugin getInstance() {
-        return instance;
-    }
+    private GameShutdownProvider shutdownProvider;
 
     @Override
     public void onEnable() {
@@ -117,6 +120,9 @@ public class DeluxeCoinflipPlugin extends FoliaWrappedJavaPlugin implements Delu
         new DupeProtection(this);
         ItemStackBuilder.setPlugin(this);
 
+        // provider for shutdown behavior
+        shutdownProvider = new DefaultGameShutdownProvider(this);
+
         final List<String> aliases = getConfigHandler(ConfigType.CONFIG).getConfig().getStringList("settings.command_aliases");
 
         final PaperCommandManager paperCommandManager = new PaperCommandManager(this);
@@ -163,7 +169,7 @@ public class DeluxeCoinflipPlugin extends FoliaWrappedJavaPlugin implements Delu
     @Override
     public void onDisable() {
         if (storageManager != null) {
-            GameShutdownHandler.shutdownAll(this);
+            shutdownProvider.shutdownAll();
             storageManager.onDisable(true);
         }
     }

@@ -176,7 +176,7 @@ public class CoinflipGUI implements Listener {
                             }
 
                             economyManager.getEconomyProvider(game.getProvider()).deposit(winner, providedWinAmount);
-                            Bukkit.getPluginManager().callEvent(new CoinflipCompletedEvent(winner, loser, providedWinAmount));
+                            new CoinflipCompletedEvent(winner, loser, providedWinAmount).callEvent();
                             plugin.getGameManager().removeCoinflipGame(game.getPlayerUUID());
                             plugin.getActiveGamesCache().unregister(game);
                         });
@@ -293,13 +293,13 @@ public class CoinflipGUI implements Listener {
 
     private void playConfiguredSound(Player player, String path, Sound def) {
         FileConfiguration cfg = plugin.getConfigHandler(ConfigType.CONFIG).getConfig();
-        ConfigurationSection s = cfg.getConfigurationSection(path);
+        ConfigurationSection section = cfg.getConfigurationSection(path);
 
-        if (s == null || !s.getBoolean("enabled", true)) {
+        if (section == null || !section.getBoolean("enabled", true)) {
             return;
         }
 
-        String name = s.getString("name", def.name());
+        String name = section.getString("name", def.name());
         Sound chosen;
         try {
             chosen = Sound.valueOf(name.toUpperCase());
@@ -307,8 +307,8 @@ public class CoinflipGUI implements Listener {
             chosen = def;
         }
 
-        float vol = (float) s.getDouble("volume", (float) 1.0);
-        float pitch = (float) s.getDouble("pitch", (float) 1.0);
+        float vol = (float) section.getDouble("volume", (float) 1.0);
+        float pitch = (float) section.getDouble("pitch", (float) 1.0);
         player.playSound(player.getLocation(), chosen, vol, pitch);
     }
 }

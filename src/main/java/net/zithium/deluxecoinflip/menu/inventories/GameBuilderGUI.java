@@ -282,10 +282,7 @@ public class GameBuilderGUI {
         List<Integer> slots = new ArrayList<>();
         if (section.contains("slots")) {
             for (String s : section.getStringList("slots")) {
-                try {
-                    slots.add(Integer.parseInt(s));
-                } catch (NumberFormatException ignored) {
-                }
+                slots.add(Integer.parseInt(s));
             }
         } else if (section.contains("slot")) {
             slots.add(section.getInt("slot"));
@@ -300,6 +297,14 @@ public class GameBuilderGUI {
         return keys.get((index + 1) % keys.size());
     }
 
+    /**
+     * Plays an error sound, temporarily changes the clicked item to an error indicator,
+     * and restores it after a delay.
+     *
+     * @param player     The player interacting with the GUI.
+     * @param event      The inventory click event.
+     * @param configPath The configuration path for the error item.
+     */
     private void handleError(Player player, InventoryClickEvent event, FileConfiguration cfg, String configPath) {
         Inventory clicked = event.getClickedInventory();
         if (clicked == null) {

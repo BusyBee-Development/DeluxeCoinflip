@@ -44,7 +44,7 @@ public enum Messages {
     GAME_SUMMARY_LOSS("coinflip.summary-loss"),
     GAME_SUMMARY_WIN("coinflip.summary-win");
 
-    private static volatile FileConfiguration config;
+    private static FileConfiguration config;
 
     private final String path;
 
