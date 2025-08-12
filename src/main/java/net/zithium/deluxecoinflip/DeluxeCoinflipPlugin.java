@@ -120,7 +120,6 @@ public class DeluxeCoinflipPlugin extends FoliaWrappedJavaPlugin implements Delu
         new DupeProtection(this);
         ItemStackBuilder.setPlugin(this);
 
-        // provider for shutdown behavior
         shutdownProvider = new DefaultGameShutdownProvider(this);
 
         final List<String> aliases = getConfigHandler(ConfigType.CONFIG).getConfig().getStringList("settings.command_aliases");
