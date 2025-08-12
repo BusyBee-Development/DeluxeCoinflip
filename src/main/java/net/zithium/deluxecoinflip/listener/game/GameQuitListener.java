@@ -52,7 +52,7 @@ public record GameQuitListener(DeluxeCoinflipPlugin plugin) implements Listener 
             Messages.GAME_REFUNDED.send(
                 quitter,
                 "{AMOUNT}", amountFormatted,
-                "{PROVIDER}", game.getProvider()
+                "{CURRENCY}", game.getProvider()
             );
         }
 

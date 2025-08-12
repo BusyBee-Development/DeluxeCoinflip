@@ -147,13 +147,13 @@ public class CoinflipCommand extends BaseCommand {
     @Subcommand("create|new")
     @CommandCompletion("* @providers")
     public void createSubCommand(final Player player, String amountInput, @Optional String currencyProvider) {
-        final long amount;
-        try {
-            amount = Long.parseLong(amountInput.replace(",", ""));
-        } catch (Exception ex) {
+        final Long parsed = TextUtil.parseAmountToLong(amountInput);
+        if (parsed == null) {
             Messages.INVALID_AMOUNT.send(player, "{INPUT}", amountInput);
             return;
         }
+
+        final long amount = parsed;
 
         if (gameManager.getCoinflipGames().containsKey(player.getUniqueId()) || activeGamesCache.isInGame(player.getUniqueId())) {
             Messages.GAME_ACTIVE.send(player);
@@ -211,12 +211,12 @@ public class CoinflipCommand extends BaseCommand {
                 return;
             }
 
-            provider.withdraw(player, amount);
+            provider.withdraw(player, (double) amount);
             gameManager.addCoinflipGame(player.getUniqueId(), coinflipGame);
 
             if (config.getBoolean("settings.broadcast-coinflip-creation")) {
                 Bukkit.getOnlinePlayers().forEach(onlinePlayer -> {
-                    java.util.Optional<PlayerData> playerDataOptional = plugin.getStorageManager().getPlayer(player.getUniqueId());
+                    java.util.Optional<PlayerData> playerDataOptional = plugin.getStorageManager().getPlayer(onlinePlayer.getUniqueId());
 
                     if (playerDataOptional.isPresent()) {
                         PlayerData playerData = playerDataOptional.get();

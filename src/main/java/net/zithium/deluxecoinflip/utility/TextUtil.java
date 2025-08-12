@@ -6,6 +6,8 @@
 package net.zithium.deluxecoinflip.utility;
 
 import net.zithium.library.utils.ColorUtil;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.util.ArrayList;
@@ -32,6 +34,13 @@ public final class TextUtil {
     private static final Pattern STRIP_LEGACY_SIMPLE  = Pattern.compile("(?i)[§&][0-9A-FK-OR]");
     private static final Pattern STRIP_HEX_HASH       = Pattern.compile("(?i)&#[0-9A-F]{6}");
     private static final Pattern STRIP_HEX_SECTION    = Pattern.compile("(?i)[§&]x(?:[§&][0-9A-F]){6}");
+
+    private static final BigDecimal THOUSAND = new BigDecimal(1000);
+    private static final BigDecimal MILLION  = new BigDecimal(1_000_000);
+    private static final BigDecimal BILLION  = new BigDecimal(1_000_000_000);
+    private static final BigDecimal TRILLION = new BigDecimal(1_000_000_000_000L);
+
+    private static final Locale PARSE_LOCALE = Locale.US;
 
     private static final char NBSP = '\u00A0';
 
@@ -163,5 +172,46 @@ public final class TextUtil {
         }
 
         return lead.append(s.substring(i)).toString();
+    }
+
+    public static Long parseAmountToLong(String input) {
+        if (input == null) {
+            return null;
+        }
+
+        final String sArg = input.trim();
+        if (sArg.isEmpty()) {
+            return null;
+        }
+
+        final String sanitized = sArg.replaceAll("[^0-9.,]", "");
+        final String remainder = sArg.replace(sanitized, "").toUpperCase(Locale.ROOT);
+
+        BigDecimal multiplier = null;
+        switch (remainder) {
+            case "" -> {
+            }
+            case "K" -> multiplier = THOUSAND;
+            case "M" -> multiplier = MILLION;
+            case "B" -> multiplier = BILLION;
+            case "T" -> multiplier = TRILLION;
+            default -> {
+                return null;
+            }
+        }
+
+        try {
+            NumberFormat nf = NumberFormat.getInstance(PARSE_LOCALE);
+            Number parsed = nf.parse(sanitized);
+            BigDecimal amount = new BigDecimal(parsed.toString());
+            if (multiplier != null) {
+                amount = amount.multiply(multiplier);
+            }
+
+            amount = amount.setScale(0, RoundingMode.FLOOR);
+            return amount.longValueExact();
+        } catch (Exception ex) {
+            return null;
+        }
     }
 }

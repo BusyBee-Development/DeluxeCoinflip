@@ -123,7 +123,7 @@ public record DefaultGameShutdownProvider(DeluxeCoinflipPlugin plugin) implement
 
         final Player online = plugin.getServer().getPlayer(playerId);
         if (online != null) {
-            Messages.GAME_REFUNDED.send(online, "{AMOUNT}", amountFormatted, "{PROVIDER}", providerIdentifier);
+            Messages.GAME_REFUNDED.send(online, "{AMOUNT}", amountFormatted, "{CURRENCY}", providerIdentifier);
         }
 
         final OfflinePlayer offline = plugin.getServer().getOfflinePlayer(playerId);

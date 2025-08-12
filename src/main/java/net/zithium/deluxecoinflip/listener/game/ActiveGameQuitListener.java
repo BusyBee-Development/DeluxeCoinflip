@@ -66,7 +66,7 @@ public final class ActiveGameQuitListener implements Listener {
                 Messages.GAME_REFUNDED.send(
                         participant,
                         "{AMOUNT}", amountFormatted,
-                        "{PROVIDER}", game.getProvider()
+                        "{CURRENCY}", game.getProvider()
                 );
             }
 

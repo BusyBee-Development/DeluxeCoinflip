@@ -39,12 +39,15 @@ public class GameManager {
     /**
      * Delete an existing coinflip game
      *
+     * <p>Scheduling on Folia when the plugin is disabling does not
+     * work and shoots an exception. Please refrain from modifying
+     * this logic unless you know what you're doing.</p>
+     *
      * @param uuid The UUID of the player removing the game
      */
     public void removeCoinflipGame(@NotNull UUID uuid) {
         coinflipGames.remove(uuid);
 
-        // If the plugin is disabled (e.g., during onDisable), DON'T schedule - run inline
         if (!plugin.isEnabled()) {
             try {
                 storageManager.getStorageHandler().deleteCoinflip(uuid);
