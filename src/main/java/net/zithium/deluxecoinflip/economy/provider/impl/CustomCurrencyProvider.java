@@ -83,6 +83,6 @@ public class CustomCurrencyProvider extends EconomyProvider {
 
     private static String getSafePlayerName(OfflinePlayer player) {
         String name = player.getName();
-        return (name != null && !name.isBlank()) ? name : "<unknown:" + player.getUniqueId() + ">";
+        return (name != null && !name.isBlank()) ? name : "<Unknown:" + player.getUniqueId() + ">";
     }
 }

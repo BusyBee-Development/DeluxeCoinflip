@@ -19,10 +19,8 @@ public final class TextUtil {
     private static final String[] SUFFIXES = {"", "k", "M", "B", "T"};
     private static final int SHORT_MAX_LEN = 5;
 
-    private static final ThreadLocal<DecimalFormat> SHORT_DF =
-            ThreadLocal.withInitial(() -> new DecimalFormat("##0E0"));
-    private static final ThreadLocal<NumberFormat> NUMBER_FORMAT =
-            ThreadLocal.withInitial(() -> NumberFormat.getNumberInstance(Locale.US));
+    private static final DecimalFormat SHORT_DF = new DecimalFormat("##0E0");
+    private static final NumberFormat NUMBER_FORMAT = NumberFormat.getNumberInstance(Locale.US);
 
     private static final Pattern COLOR_SIMPLE      = Pattern.compile("(?i)(?<!&r|§r)([&§][0-9a-f])");
     private static final Pattern COLOR_HEX_HASH    = Pattern.compile("(?i)(?<!&r|§r)&#([0-9a-f]{6})");
@@ -38,7 +36,7 @@ public final class TextUtil {
     private static final char NBSP = '\u00A0';
 
     public static String format(double number) {
-        String repr = SHORT_DF.get().format(number);
+        String repr = SHORT_DF.format(number);
         int expDigit = Character.getNumericValue(repr.charAt(repr.length() - 1));
         int suffixIndex = Math.max(0, Math.min(expDigit / 3, SUFFIXES.length - 1));
         repr = EXPONENT_SUFFIX.matcher(repr).replaceAll(SUFFIXES[suffixIndex]);
@@ -51,7 +49,7 @@ public final class TextUtil {
     }
 
     public static String numberFormat(long amount) {
-        return NUMBER_FORMAT.get().format(amount);
+        return NUMBER_FORMAT.format(amount);
     }
 
     public static String color(String input) {
