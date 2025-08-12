@@ -11,6 +11,7 @@ import net.zithium.deluxecoinflip.DeluxeCoinflipPlugin;
 import net.zithium.deluxecoinflip.config.ConfigType;
 import net.zithium.deluxecoinflip.config.Messages;
 import net.zithium.deluxecoinflip.game.CoinflipGame;
+import net.zithium.deluxecoinflip.utility.TextUtil;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -66,15 +67,14 @@ public record PlayerChatListener(DeluxeCoinflipPlugin plugin) implements Listene
                 return;
             }
 
-            final long amount;
-            try {
-                final String digits = message.replace(",", "").replaceAll("[^0-9]", "");
-                amount = Long.parseLong(digits);
-            } catch (Exception ex) {
+            final Long parsed = TextUtil.parseAmountToLong(message);
+            if (parsed == null) {
                 event.setCancelled(true);
                 Messages.INVALID_AMOUNT.send(player, "{INPUT}", message.replace(",", ""));
                 return;
             }
+
+            final long amount = parsed;
 
             final FileConfiguration config = plugin.getConfigHandler(ConfigType.CONFIG).getConfig();
             final long maximumBet = config.getLong("settings.maximum-bet");
@@ -132,15 +132,14 @@ public record PlayerChatListener(DeluxeCoinflipPlugin plugin) implements Listene
                 return;
             }
 
-            final long amount;
-            try {
-                final String digits = message.replace(",", "").replaceAll("[^0-9]", "");
-                amount = Long.parseLong(digits);
-            } catch (Exception ex) {
+            final Long parsed = TextUtil.parseAmountToLong(message);
+            if (parsed == null) {
                 event.setCancelled(true);
                 Messages.INVALID_AMOUNT.send(player, "{INPUT}", message.replace(",", ""));
                 return;
             }
+
+            final long amount = parsed;
 
             final FileConfiguration config = plugin.getConfigHandler(ConfigType.CONFIG).getConfig();
             final long maximumBet = config.getLong("settings.maximum-bet");
