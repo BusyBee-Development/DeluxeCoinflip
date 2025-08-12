@@ -13,10 +13,10 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.stream.Collectors;
 
 public final class ActiveGamesCache {
 
@@ -58,30 +58,30 @@ public final class ActiveGamesCache {
         }
 
         if (!removedAny && (playerId == null || opponentId == null)) {
-            this.activeGames.entrySet().removeIf(e -> e.getValue() == game);
+            this.activeGames.entrySet().removeIf(entry -> entry.getValue() == game);
         }
     }
 
     public List<UUID> getParticipants(@NotNull CoinflipGame game) {
-        final UUID a = game.getPlayerUUID();
-        final UUID b = game.getOpponentUUID();
+        final UUID playerId = game.getPlayerUUID();
+        final UUID opponentUUID = game.getOpponentUUID();
 
-        if (a != null && b != null) {
-            return Arrays.asList(a, b);
+        if (playerId != null && opponentUUID != null) {
+            return Arrays.asList(playerId, opponentUUID);
         }
 
-        if (a != null) {
-            return Collections.singletonList(a);
+        if (playerId != null) {
+            return Collections.singletonList(playerId);
         }
 
-        if (b != null) {
-            return Collections.singletonList(b);
+        if (opponentUUID != null) {
+            return Collections.singletonList(opponentUUID);
         }
 
         return this.activeGames.entrySet().stream()
-                .filter(e -> e.getValue() == game)
-                .map(java.util.Map.Entry::getKey)
-                .collect(Collectors.toList());
+                .filter(entry -> entry.getValue() == game)
+                .map(Map.Entry::getKey)
+                .toList();
     }
 
     public Collection<CoinflipGame> getAllUniqueGames() {
