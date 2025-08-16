@@ -6,7 +6,6 @@
 package net.zithium.deluxecoinflip.config;
 
 import net.zithium.deluxecoinflip.utility.TextUtil;
-import net.zithium.library.utils.ColorUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -46,6 +45,7 @@ public enum Messages {
     GAME_SUMMARY_WIN("coinflip.summary-win");
 
     private static FileConfiguration config;
+
     private final String path;
 
     Messages(String path) {
@@ -57,32 +57,63 @@ public enum Messages {
     }
 
     public void broadcast(Object... replacements) {
+        if (config == null) {
+            return;
+        }
+
         Bukkit.getOnlinePlayers().forEach(player -> send(player, replacements));
     }
 
     public void send(CommandSender receiver, Object... replacements) {
+        if (config == null || receiver == null) {
+            return;
+        }
+
         Object value = config.get(this.path);
 
         String message;
         if (value == null) {
             message = "DeluxeCoinflip: message not found (" + this.path + ")";
+        } else if (value instanceof List) {
+            List<String> lines = config.getStringList(this.path);
+            message = TextUtil.fromList(lines);
         } else {
-            message = value instanceof List ? TextUtil.fromList((List<?>) value) : value.toString();
+            message = String.valueOf(value);
         }
 
-        if (message != null && !message.isEmpty()) {
-            receiver.sendMessage(ColorUtil.color(replace(message, replacements)));
+        if (message == null || message.isEmpty()) {
+            return;
         }
+
+        String colored = TextUtil.color(replace(message, replacements));
+        if (colored == null || colored.isEmpty()) {
+            return;
+        }
+
+        receiver.sendMessage(colored);
     }
 
     private String replace(String message, Object... replacements) {
-        for (int i = 0; i < replacements.length; i += 2) {
-            if (i + 1 >= replacements.length) break;
-            message = message.replace(String.valueOf(replacements[i]), String.valueOf(replacements[i + 1]));
+        if (message == null) {
+            return "";
         }
 
-        String prefix = config.getString(PREFIX.getPath());
-        return message.replace("{PREFIX}", prefix != null && !prefix.isEmpty() ? prefix : "");
+        if (replacements != null) {
+            for (int i = 0; i + 1 < replacements.length; i += 2) {
+                String key = String.valueOf(replacements[i]);
+                String val = String.valueOf(replacements[i + 1]);
+                if (key != null && !key.isEmpty()) {
+                    message = message.replace(key, val != null ? val : "");
+                }
+            }
+        }
+
+        if (config != null) {
+            String prefix = config.getString(PREFIX.getPath());
+            message = message.replace("{PREFIX}", (prefix != null && !prefix.isEmpty()) ? prefix : "");
+        }
+
+        return message;
     }
 
     public String getPath() {

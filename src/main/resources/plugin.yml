@@ -1,5 +1,5 @@
 name: DeluxeCoinflip
-version: '${version}'
+version: ${version}
 main: net.zithium.deluxecoinflip.DeluxeCoinflipPlugin
 authors: [ ItzSave, ItsLewizzz, ItsSimplyLeo ]
 api-version: 1.19

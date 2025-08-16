@@ -10,17 +10,23 @@ import net.zithium.deluxecoinflip.utility.ItemStackBuilder;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.OfflinePlayer;
+import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.UUID;
 
-public class CoinflipGame {
+public class CoinflipGame implements Cloneable {
 
     private final UUID uuid;
     private OfflinePlayer player;
     private String provider;
     private long amount;
     private ItemStack cachedHead;
+
+    private transient volatile boolean activeGame = false;
+    private transient volatile UUID opponent;
 
     public CoinflipGame(UUID uuid, String provider, long amount) {
         this.uuid = uuid;
@@ -46,13 +52,16 @@ public class CoinflipGame {
         return uuid;
     }
 
+    public @Nullable UUID getOpponentUUID() {
+        return opponent;
+    }
+
     public long getAmount() {
         return amount;
     }
 
     public void setAmount(long amount) {
-        this.amount = amount;
-        if (this.amount < 0) this.amount = 0;
+        this.amount = Math.max(amount, 0);
     }
 
     public OfflinePlayer getOfflinePlayer() {
@@ -60,7 +69,7 @@ public class CoinflipGame {
     }
 
     public ItemStack getCachedHead() {
-        return cachedHead.clone();
+        return cachedHead != null ? cachedHead.clone() : new ItemStack(Material.PLAYER_HEAD);
     }
 
     public String getProvider() {
@@ -71,7 +80,64 @@ public class CoinflipGame {
         this.provider = provider;
     }
 
+    @Override
     public CoinflipGame clone() {
-        return new CoinflipGame(uuid, provider, amount, player, cachedHead);
+        try {
+            CoinflipGame copy = (CoinflipGame) super.clone();
+            copy.cachedHead = (this.cachedHead != null) ? this.cachedHead.clone() : null;
+            return copy;
+        } catch (CloneNotSupportedException ex) {
+            throw new AssertionError(ex);
+        }
+    }
+
+    public boolean isActiveGame() {
+        return activeGame;
+    }
+
+    public void setActiveGame(boolean activeGame) {
+        this.activeGame = activeGame;
+    }
+
+    public void attachOpponent(@NotNull UUID opponent) {
+        this.opponent = opponent;
+    }
+
+    public void stopAnimation() {
+        this.activeGame = false;
+
+        final Player creatorOnline = (player != null) ? player.getPlayer() : null;
+        final Player opponentOnline = (opponent != null) ? Bukkit.getPlayer(opponent) : null;
+
+        boolean canSchedule = DeluxeCoinflipPlugin.getInstance() != null
+                && DeluxeCoinflipPlugin.getInstance().isEnabled();
+
+        if (creatorOnline != null) {
+            if (canSchedule) {
+                DeluxeCoinflipPlugin.getInstance().getScheduler().runTaskLaterAtEntity(creatorOnline, () -> {
+                    if (creatorOnline.isOnline()) {
+                        creatorOnline.closeInventory();
+                    }
+                }, 20L);
+            } else {
+                if (creatorOnline.isOnline()) {
+                    creatorOnline.closeInventory();
+                }
+            }
+        }
+
+        if (opponentOnline != null) {
+            if (canSchedule) {
+                DeluxeCoinflipPlugin.getInstance().getScheduler().runTaskLaterAtEntity(opponentOnline, () -> {
+                    if (opponentOnline.isOnline()) {
+                        opponentOnline.closeInventory();
+                    }
+                }, 20L);
+            } else {
+                if (opponentOnline.isOnline()) {
+                    opponentOnline.closeInventory();
+                }
+            }
+        }
     }
 }

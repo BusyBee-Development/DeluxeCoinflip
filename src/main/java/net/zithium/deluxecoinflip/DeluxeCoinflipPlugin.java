@@ -10,6 +10,7 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import me.nahu.scheduler.wrapper.FoliaWrappedJavaPlugin;
 import net.zithium.deluxecoinflip.api.DeluxeCoinflipAPI;
+import net.zithium.deluxecoinflip.cache.ActiveGamesCache;
 import net.zithium.deluxecoinflip.command.CoinflipCommand;
 import net.zithium.deluxecoinflip.config.ConfigHandler;
 import net.zithium.deluxecoinflip.config.ConfigType;
@@ -21,45 +22,66 @@ import net.zithium.deluxecoinflip.game.GameManager;
 import net.zithium.deluxecoinflip.hook.DiscordHook;
 import net.zithium.deluxecoinflip.hook.PlaceholderAPIHook;
 import net.zithium.deluxecoinflip.listener.PlayerChatListener;
+import net.zithium.deluxecoinflip.listener.game.ActiveGameQuitListener;
+import net.zithium.deluxecoinflip.listener.game.GameQuitListener;
+import net.zithium.deluxecoinflip.menu.DupeProtection;
 import net.zithium.deluxecoinflip.menu.InventoryManager;
 import net.zithium.deluxecoinflip.storage.PlayerData;
 import net.zithium.deluxecoinflip.storage.StorageManager;
-import org.bstats.bukkit.Metrics;
-import net.zithium.deluxecoinflip.menu.DupeProtection;
-import org.bukkit.Bukkit;
-import org.bukkit.entity.Player;
+import net.zithium.deluxecoinflip.storage.handler.GameShutdownProvider;
+import net.zithium.deluxecoinflip.storage.handler.impl.DefaultGameShutdownProvider;
 import net.zithium.deluxecoinflip.utility.ItemStackBuilder;
+import org.bstats.bukkit.Metrics;
+import org.bukkit.Bukkit;
 import org.bukkit.NamespacedKey;
+import org.bukkit.entity.Player;
 
-import java.util.HashMap;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
-import java.util.stream.Collectors;
 
 public class DeluxeCoinflipPlugin extends FoliaWrappedJavaPlugin implements DeluxeCoinflipAPI {
 
+    private static final int BSTATS_PLUGIN_ID = 20887;
+
     private static DeluxeCoinflipPlugin instance;
+
+    public static DeluxeCoinflipPlugin getInstance() {
+        return instance;
+    }
 
     private Map<ConfigType, ConfigHandler> configMap;
     private StorageManager storageManager;
     private GameManager gameManager;
+    private ActiveGamesCache activeGamesCache;
     private InventoryManager inventoryManager;
     private EconomyManager economyManager;
     private DiscordHook discordHook;
 
     private Cache<UUID, CoinflipGame> listenerCache;
 
+    private GameShutdownProvider shutdownProvider;
+
+    @Override
     public void onEnable() {
         instance = this;
-        long start = System.currentTimeMillis();
+        final long startNanos = System.nanoTime();
+
+        // We are fully aware that both of these are deprecated; however, they are necessary.
+        @SuppressWarnings("deprecation")
+        final String pluginVersion = getDescription().getVersion();
+        // get(0) is required since getFirst is not supported for getAuthors.
+        @SuppressWarnings("deprecation")
+        final String pluginAuthor = getDescription().getAuthors().isEmpty() ? "Unknown" : getDescription().getAuthors().get(0);
 
         getLogger().log(Level.INFO, "");
-        getLogger().log(Level.INFO, " __ __    DeluxeCoinflip v" + getDescription().getVersion());
-        getLogger().log(Level.INFO, "/  |_     Author: " + getDescription().getAuthors().get(1));
+        getLogger().log(Level.INFO, " __ __    DeluxeCoinflip v" + pluginVersion);
+        getLogger().log(Level.INFO, "/  |_     Author: " + pluginAuthor);
         getLogger().log(Level.INFO, "\\_ |      (c) Zithium Studios 2021 - 2025. All rights reserved.");
         getLogger().log(Level.INFO, "");
 
@@ -68,7 +90,7 @@ public class DeluxeCoinflipPlugin extends FoliaWrappedJavaPlugin implements Delu
         listenerCache = CacheBuilder.newBuilder().expireAfterWrite(30, TimeUnit.SECONDS).maximumSize(500).build();
 
         // Register configurations
-        configMap = new HashMap<>();
+        configMap = new EnumMap<>(ConfigType.class);
         registerConfig(ConfigType.CONFIG);
         registerConfig(ConfigType.MESSAGES);
         Messages.setConfiguration(configMap.get(ConfigType.MESSAGES).getConfig());
@@ -91,50 +113,66 @@ public class DeluxeCoinflipPlugin extends FoliaWrappedJavaPlugin implements Delu
 
         gameManager = new GameManager(this);
 
+        activeGamesCache = new ActiveGamesCache();
+
         inventoryManager = new InventoryManager();
         inventoryManager.load(this);
         new DupeProtection(this);
         ItemStackBuilder.setPlugin(this);
 
-        List<String> aliases = getConfigHandler(ConfigType.CONFIG).getConfig().getStringList("settings.command_aliases");
+        shutdownProvider = new DefaultGameShutdownProvider(this);
 
-        PaperCommandManager paperCommandManager = new PaperCommandManager(this);
-        paperCommandManager.getCommandCompletions().registerAsyncCompletion("providers", c -> economyManager.getEconomyProviders().values().stream().map(EconomyProvider::getDisplayName).collect(Collectors.toList()));
+        final List<String> aliases = getConfigHandler(ConfigType.CONFIG).getConfig().getStringList("settings.command_aliases");
+
+        final PaperCommandManager paperCommandManager = new PaperCommandManager(this);
+        paperCommandManager.getCommandCompletions().registerAsyncCompletion(
+                "providers",
+                completionContext -> economyManager.getEconomyProviders()
+                        .values()
+                        .stream()
+                        .map(EconomyProvider::getDisplayName)
+                        .toList()
+        );
         paperCommandManager.getCommandReplacements().addReplacement("main", "coinflip|" + String.join("|", aliases));
-        paperCommandManager.registerCommand(new CoinflipCommand(this).setExceptionHandler((command, registeredCommand, sender, args, t) -> {
-            Messages.NO_PERMISSION.send(sender.getIssuer());
-            return true;
-        }));
+        paperCommandManager.registerCommand(
+                new CoinflipCommand(this).setExceptionHandler((command, registeredCommand, sender, args, throwable) -> {
+                    Messages.NO_PERMISSION.send(sender.getIssuer());
+                    return true;
+                })
+        );
 
-        // Register listeners
         new PlayerChatListener(this);
+        new ActiveGameQuitListener(this);
+        new GameQuitListener(this);
 
-        // PlaceholderAPI Hook
         if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
             new PlaceholderAPIHook(this).register();
             getLogger().log(Level.INFO, "Hooked into PlaceholderAPI successfully");
         }
 
+        final long loadMilliseconds = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
         getLogger().log(Level.INFO, "");
-        getLogger().log(Level.INFO, "Successfully loaded in " + (System.currentTimeMillis() - start) + "ms");
+        getLogger().log(Level.INFO, "Successfully loaded in " + loadMilliseconds + "ms");
         getLogger().log(Level.INFO, "");
     }
 
     private void enableMetrics() {
         if (getConfig().getBoolean("metrics", true)) {
-            getLogger().log(Level.INFO, "Loading bStats metrics");
-            new Metrics(this, 20887);
+            getLogger().log(Level.INFO, "Loading bStats metrics...");
+            new Metrics(this, BSTATS_PLUGIN_ID);
         } else {
-            getLogger().log(Level.INFO, "Metrics are disabled");
+            getLogger().log(Level.INFO, "Metrics are disabled.");
         }
     }
 
     @Override
     public void onDisable() {
-        if (storageManager != null) storageManager.onDisable(true);
+        if (storageManager != null) {
+            shutdownProvider.shutdownAll();
+            storageManager.onDisable(true);
+        }
     }
 
-    // Plugin reload handling
     public void reload() {
         configMap.values().forEach(ConfigHandler::reload);
         Messages.setConfiguration(configMap.get(ConfigType.MESSAGES).getConfig());
@@ -143,9 +181,9 @@ public class DeluxeCoinflipPlugin extends FoliaWrappedJavaPlugin implements Delu
         economyManager.onEnable();
     }
 
-    // Method to register a configuration file
     private void registerConfig(ConfigType type) {
-        ConfigHandler handler = new ConfigHandler(this, type.toString().toLowerCase());
+        final String fileName = type.name().toLowerCase(Locale.ROOT);
+        ConfigHandler handler = new ConfigHandler(this, fileName);
         handler.saveDefaultConfig();
         configMap.put(type, handler);
     }
@@ -164,6 +202,10 @@ public class DeluxeCoinflipPlugin extends FoliaWrappedJavaPlugin implements Delu
 
     public GameManager getGameManager() {
         return gameManager;
+    }
+
+    public ActiveGamesCache getActiveGamesCache() {
+        return activeGamesCache;
     }
 
     public EconomyManager getEconomyManager() {
@@ -191,9 +233,5 @@ public class DeluxeCoinflipPlugin extends FoliaWrappedJavaPlugin implements Delu
     @Override
     public Optional<PlayerData> getPlayerData(Player player) {
         return storageManager.getPlayer(player.getUniqueId());
-    }
-
-    public static DeluxeCoinflipPlugin getInstance() {
-        return instance;
     }
 }

@@ -18,14 +18,12 @@ import java.text.NumberFormat;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
-public class DiscordHook {
+public record DiscordHook(ConfigHandler configHandler) {
 
     private static final NumberFormat numberFormat = NumberFormat.getInstance();
 
-    private final ConfigHandler configHandler;
-
     public DiscordHook(DeluxeCoinflipPlugin plugin) {
-        configHandler = plugin.getConfigHandler(ConfigType.CONFIG);
+        this(plugin.getConfigHandler(ConfigType.CONFIG));
     }
 
     public CompletableFuture<DiscordIntegration> executeWebhook(OfflinePlayer winner, OfflinePlayer loser, String currency, long amount) {
@@ -57,11 +55,11 @@ public class DiscordHook {
                 .setAvatarUrl(replace(config.getString("discord.webhook.avatar", ""), winner, loser, currency, amount))
                 .setContent(replace(config.getString("discord.message.content", ""), winner, loser, currency, amount));
 
-        if (config.getBoolean("discord.message.embed.enabled", false))
+        if (config.getBoolean("discord.message.embed.enabled", false)) {
             webhook.addEmbed(getEmbed(winner, loser, currency, amount));
+        }
 
         webhook.debug(config.getBoolean("discord.debug", false));
-
         return webhook;
     }
 

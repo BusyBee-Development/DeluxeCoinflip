@@ -1,10 +1,10 @@
 plugins {
     id("java")
-    id("com.gradleup.shadow") version "8.3.6"
+    id("com.gradleup.shadow") version "9.0.1"
 }
 
 group = "net.zithium"
-version = "2.10.4"
+version = "2.11.0"
 description = "DeluxeCoinflip"
 
 repositories {
@@ -64,6 +64,11 @@ tasks {
         minimize {
             exclude(dependency("com.github.NahuLD.folia-scheduler-wrapper:folia-scheduler-wrapper:.*"))
         }
+
+        dependencies {
+            exclude(dependency("net.kyori:.*"))
+        }
+        exclude("net/kyori/**")
 
         archiveFileName.set("DeluxeCoinflip-${project.version}.jar")
         relocate("dev.triumphteam.gui", "net.zithium.deluxecoinflip.libs.gui")

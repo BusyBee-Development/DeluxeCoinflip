@@ -110,7 +110,7 @@ discord:
     embed:
       enabled: true
       title: "%amount% %currency%"
-      description: "%winner% (Winner) VS %loser%"
+      description: "%winner% (Winner) vs %loser%"
       color:
         r: 0
         g: 0
@@ -119,14 +119,43 @@ discord:
 
 coinflip-gui:
   title: "&lFLIPPING COIN..."
-  # There can only be two items here. Both must be present!
+  player-items:
+    winner:
+      material: "PLAYER_HEAD"
+      base64: ""
+      use-player-skin: true
+      display_name: "&e{PLAYER}"
+      lore: []
+    loser:
+      material: "PLAYER_HEAD"
+      base64: ""
+      use-player-skin: true
+      display_name: "&e{PLAYER}"
+      lore: []
   animation:
     1:
       material: YELLOW_STAINED_GLASS_PANE
       display_name: '&r'
+      lore: []
     2:
       material: GRAY_STAINED_GLASS_PANE
       display_name: '&r'
+      lore: []
+  sounds:
+    # Played every tick while the animation is running,
+    # but only if the player still has the GUI open.
+    animation_tick:
+      enabled: true
+      name: "BLOCK_WOODEN_BUTTON_CLICK_ON"
+      volume: 1.0
+      pitch: 1.0
+    # Played when the animation completes (level up).
+    # This can play even if the player closed the GUI.
+    animation_complete:
+      enabled: true
+      name: "ENTITY_PLAYER_LEVELUP"
+      volume: 1.0
+      pitch: 1.0
 
 games-gui:
   title: "&lCOINFLIP GAMES"
@@ -158,13 +187,21 @@ games-gui:
 
   # Items below here are fixed, and the ID should not be removed/changed.
   create-new-game:
-    # Set false to disable the game builder gui
+    # Set false to disable the Game Builder GUI
     enabled: true
     slot: 35
     material: NETHER_STAR
     display_name: "&a&lCreate Game"
     lore:
       - "&7Click here to create a new game!"
+  refresh:
+    # Set false to disable the refresh button
+    enabled: true
+    slot: 27
+    material: SUNFLOWER
+    display_name: "&b&lRefresh"
+    lore:
+      - "&7Refresh the list."
   coinflip-game:
     display_name: "&e{PLAYER}"
     material: PLAYER_HEAD
@@ -203,6 +240,13 @@ games-gui:
     display_name: "&c&lPrevious Page"
     lore:
       - "&7Click to go to the previous page."
+  sounds:
+    # Played when the player tries to join a game but lacks funds.
+    error_no_funds:
+      enabled: true
+      name: "BLOCK_NOTE_BLOCK_PLING"
+      volume: 1.0
+      pitch: 0.0
 
 gamebuilder-gui:
   title: "&lGAME BUILDER"
@@ -297,3 +341,22 @@ gamebuilder-gui:
     lore:
       - ""
       - "&fYou do not have enough to create this game"
+  sounds:
+    # Click when cycling currencies in the selector.
+    currency_select_click:
+      enabled: true
+      name: "BLOCK_TRIPWIRE_CLICK_ON"
+      volume: 1.0
+      pitch: 0.0
+    # Click when changing the amount (+/- buttons).
+    amount_adjust_click:
+      enabled: true
+      name: "BLOCK_TRIPWIRE_CLICK_ON"
+      volume: 1.0
+      pitch: 0.0
+    # Generic error in the Game Builder (limits, already have game, no funds in builder).
+    error:
+      enabled: true
+      name: "BLOCK_NOTE_BLOCK_PLING"
+      volume: 1.0
+      pitch: 0.0

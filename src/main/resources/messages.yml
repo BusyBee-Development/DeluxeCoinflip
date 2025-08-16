@@ -6,7 +6,7 @@
 #   https://github.com/itzsave/DeluxeCoinflipAPI
 
 general:
-  prefix: "<dark_gray>[<gradient:gold:yellow:gold><b>DeluxeCoinflip</gradient><dark_gray>]  "
+  prefix: "<dark_gray>[<gradient:gold:yellow:gold><b>DeluxeCoinflip</gradient><dark_gray>]"
   reload: "{PREFIX} &7The configuration files have been reloaded!"
   no-permission: "&cYou do not have permission to execute this command."
   help_default:

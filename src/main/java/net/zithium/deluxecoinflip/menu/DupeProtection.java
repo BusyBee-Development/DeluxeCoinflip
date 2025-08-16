@@ -7,7 +7,9 @@ package net.zithium.deluxecoinflip.menu;
 
 import net.zithium.deluxecoinflip.DeluxeCoinflipPlugin;
 import org.bukkit.Bukkit;
+import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
+import org.bukkit.event.Cancellable;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -16,81 +18,80 @@ import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
-
 import java.util.concurrent.CompletableFuture;
 
-public class DupeProtection implements Listener {
+public record DupeProtection(NamespacedKey dupeKey) implements Listener {
 
-    private final DeluxeCoinflipPlugin plugin;
+    private static final String KEY_PATH = "dcf.dupeprotection";
 
     public DupeProtection(DeluxeCoinflipPlugin plugin) {
-        this.plugin = plugin;
+        this(plugin.getKey(KEY_PATH));
         Bukkit.getPluginManager().registerEvents(this, plugin);
     }
 
-    private void cleanPlayerInventoryAsync(Player player) {
-        if (!player.isOnline()) return;
+    private void cleanPlayerInventory(Player player) {
+        if (player == null || !player.isOnline()) {
+            return;
+        }
 
-        // Run async to minimize impact on the main thread
         CompletableFuture.supplyAsync(() -> {
             ItemStack[] contents = player.getInventory().getContents();
             boolean changed = false;
 
-            // Check for protected items and nullify them
-            for (int i = 0; i < contents.length; i++) {
-                ItemStack item = contents[i];
+            for (int slot = 0; slot < contents.length; slot++) {
+                ItemStack item = contents[slot];
                 if (isProtected(item)) {
-                    contents[i] = null;
+                    contents[slot] = null;
                     changed = true;
                 }
             }
 
-            return changed ? contents : null;
-        }).thenAccept(updatedContents -> {
-            if (updatedContents != null && player.isOnline()) {
-                // Update inventory safely on the main thread
-                plugin.getScheduler().runTask(() -> player.getInventory().setContents(updatedContents));
+            if (changed && player.isOnline()) {
+                player.getInventory().setContents(contents);
             }
+
+            return changed;
         });
     }
 
     private boolean isProtected(ItemStack item) {
-        if (item == null || !item.hasItemMeta()) return false;
-        var meta = item.getItemMeta();
-        var container = meta.getPersistentDataContainer();
-        return container.has(plugin.getKey("dcf.dupeprotection"), PersistentDataType.BYTE);
+        if (item == null || !item.hasItemMeta()) {
+            return false;
+        }
+
+        PersistentDataContainer container = item.getItemMeta().getPersistentDataContainer();
+        return container.has(dupeKey, PersistentDataType.BYTE);
     }
 
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    private void cancelIfProtected(ItemStack item, Cancellable event) {
+        if (isProtected(item)) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onDrop(PlayerDropItemEvent event) {
-        // Only cancel the drop event if the dropped item is flagged.
-        ItemStack droppedItem = event.getItemDrop().getItemStack();
-        if (isProtected(droppedItem)) {
-            event.setCancelled(true);
-        }
-        cleanPlayerInventoryAsync(event.getPlayer());
+        cancelIfProtected(event.getItemDrop().getItemStack(), event);
+        cleanPlayerInventory(event.getPlayer());
     }
 
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onInteract(PlayerInteractEvent event) {
-        // Only cancel the interact event if the item being used is flagged.
-        ItemStack interactedItem = event.getItem();
-        if (isProtected(interactedItem)) {
-            event.setCancelled(true);
-        }
-        cleanPlayerInventoryAsync(event.getPlayer());
+        cancelIfProtected(event.getItem(), event);
+        cleanPlayerInventory(event.getPlayer());
     }
 
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onCommand(PlayerCommandPreprocessEvent event) {
-        cleanPlayerInventoryAsync(event.getPlayer());
+        cleanPlayerInventory(event.getPlayer());
     }
 
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onOpen(InventoryOpenEvent event) {
         if (event.getPlayer() instanceof Player player) {
-            cleanPlayerInventoryAsync(player);
+            cleanPlayerInventory(player);
         }
     }
 }

@@ -15,6 +15,7 @@ import co.aikar.commands.annotation.Optional;
 import co.aikar.commands.annotation.Subcommand;
 import net.zithium.deluxecoinflip.DeluxeCoinflipPlugin;
 import net.zithium.deluxecoinflip.api.events.CoinflipCreatedEvent;
+import net.zithium.deluxecoinflip.cache.ActiveGamesCache;
 import net.zithium.deluxecoinflip.config.ConfigType;
 import net.zithium.deluxecoinflip.config.Messages;
 import net.zithium.deluxecoinflip.economy.EconomyManager;
@@ -23,7 +24,6 @@ import net.zithium.deluxecoinflip.game.CoinflipGame;
 import net.zithium.deluxecoinflip.game.GameManager;
 import net.zithium.deluxecoinflip.storage.PlayerData;
 import net.zithium.deluxecoinflip.utility.TextUtil;
-import net.zithium.library.utils.ColorUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -41,21 +41,23 @@ public class CoinflipCommand extends BaseCommand {
     private final DeluxeCoinflipPlugin plugin;
     private final EconomyManager economyManager;
     private final GameManager gameManager;
+    private final ActiveGamesCache activeGamesCache;
 
     public CoinflipCommand(final DeluxeCoinflipPlugin plugin) {
         this.plugin = plugin;
         this.economyManager = plugin.getEconomyManager();
         this.gameManager = plugin.getGameManager();
+        this.activeGamesCache = plugin.getActiveGamesCache();
     }
 
     @Default
     public void defaultCommand(final CommandSender sender) {
-        if (!(sender instanceof Player)) {
+        if (!(sender instanceof Player player)) {
             sender.sendMessage("Console cannot open the coinflip GUI, use /coinflip help");
             return;
         }
 
-        plugin.getInventoryManager().getGamesGUI().openInventory((Player) sender);
+        plugin.getInventoryManager().getGamesGUI().openInventory(player);
     }
 
     @Subcommand("reload")
@@ -67,38 +69,49 @@ public class CoinflipCommand extends BaseCommand {
 
     @Subcommand("help")
     public void helpSubCommand(final CommandSender sender) {
-        Messages.HELP_DEFAULT.send(sender, "{PROVIDERS}", economyManager.getEconomyProviders().values().stream().map(p -> p.getDisplayName().toLowerCase()).collect(Collectors.joining(", ")));
-        if (sender.hasPermission("coinflip.admin")) Messages.HELP_ADMIN.send(sender);
+        Messages.HELP_DEFAULT.send(sender, "{PROVIDERS}",
+            economyManager.getEconomyProviders().values().stream()
+                .map(p -> p.getDisplayName().toLowerCase())
+                .collect(Collectors.joining(", ")));
+
+        if (sender.hasPermission("coinflip.admin")) {
+            Messages.HELP_ADMIN.send(sender);
+        }
     }
 
     @Subcommand("about")
     public void aboutSubCommand(final CommandSender sender) {
+        // We are fully aware of this deprecation.
+        @SuppressWarnings("deprecation")
+        final String pluginVersion = plugin.getDescription().getVersion();
+
         sender.sendMessage("");
-        sender.sendMessage(ColorUtil.color("&e&lDeluxeCoinflip"));
-        sender.sendMessage(ColorUtil.color("&eVersion: &fv" + plugin.getDescription().getVersion()));
-        sender.sendMessage(ColorUtil.color("&eAuthor: &fItzSave"));
+        sender.sendMessage(TextUtil.color("&e&lDeluxeCoinflip"));
+        sender.sendMessage(TextUtil.color("&eVersion: &fv" + pluginVersion));
+        sender.sendMessage(TextUtil.color("&eAuthor: &fItzSave"));
 
         if (!TextUtil.isValidDownload()) {
-            sender.sendMessage(ColorUtil.color("&4Registered to: &cFailed to find licensed owner to this plugin. Contact developer to report possible leak (itzsave)."));
+            sender.sendMessage(TextUtil.color("&4Registered to: &cFailed to find licensed owner to this plugin. Contact developer to report possible leak (itzsave)."));
         } else if (TextUtil.isBuiltByBit()) {
-            sender.sendMessage(ColorUtil.color("&4Registered to: &chttps://builtbybit.com/members/%%__USER__%%/"));
+            sender.sendMessage(TextUtil.color("&4Registered to: &chttps://builtbybit.com/members/%%__USER__%%/"));
         } else {
-            sender.sendMessage(ColorUtil.color("&4Registered to: &chttps://www.spigotmc.org/members/%%__USER__%%/"));
+            sender.sendMessage(TextUtil.color("&4Registered to: &chttps://www.spigotmc.org/members/%%__USER__%%/"));
         }
+
         sender.sendMessage("");
     }
 
     @Subcommand("toggle")
     public void toggleSubCommand(final CommandSender sender) {
         if (!(sender instanceof Player player)) {
-            sender.sendMessage("Only players can toggle broadcast messages");
+            sender.sendMessage("Only players can toggle broadcast messages.");
             return;
         }
 
         java.util.Optional<PlayerData> playerDataOptional = plugin.getStorageManager().getPlayer(player.getUniqueId());
 
         if (playerDataOptional.isEmpty()) {
-            sender.sendMessage(ColorUtil.color("&cYour player data has not loaded yet, please wait a few moments or relog."));
+            sender.sendMessage(TextUtil.color("&cYour player data has not loaded yet, please wait a few moments or relog."));
             return;
         }
 
@@ -115,7 +128,7 @@ public class CoinflipCommand extends BaseCommand {
     @Subcommand("delete|remove")
     public void deleteSubCommand(final CommandSender sender) {
         if (!(sender instanceof Player player)) {
-            sender.sendMessage("Only players can remove a coinflip game");
+            sender.sendMessage("Only players can remove a coinflip game.");
             return;
         }
 
@@ -126,7 +139,6 @@ public class CoinflipCommand extends BaseCommand {
             economyManager.getEconomyProvider(game.getProvider()).deposit(player, game.getAmount());
             gameManager.removeCoinflipGame(uuid);
             Messages.DELETED_GAME.send(player);
-
         } else {
             Messages.GAME_NOT_FOUND.send(player);
         }
@@ -135,15 +147,15 @@ public class CoinflipCommand extends BaseCommand {
     @Subcommand("create|new")
     @CommandCompletion("* @providers")
     public void createSubCommand(final Player player, String amountInput, @Optional String currencyProvider) {
-        final long amount;
-        try {
-            amount = Long.parseLong(amountInput.replace(",", ""));
-        } catch (Exception ex) {
+        final Long parsed = TextUtil.parseAmountToLong(amountInput);
+        if (parsed == null) {
             Messages.INVALID_AMOUNT.send(player, "{INPUT}", amountInput);
             return;
         }
 
-        if (gameManager.getCoinflipGames().containsKey(player.getUniqueId())) {
+        final long amount = parsed;
+
+        if (gameManager.getCoinflipGames().containsKey(player.getUniqueId()) || activeGamesCache.isInGame(player.getUniqueId())) {
             Messages.GAME_ACTIVE.send(player);
             return;
         }
@@ -156,13 +168,13 @@ public class CoinflipCommand extends BaseCommand {
         }
 
         if (amount < config.getLong("settings.minimum-bet")) {
-            Messages.CREATE_MINIMUM_AMOUNT.send(player,"{MIN_BET}", TextUtil.numberFormat(config.getLong("settings.minimum-bet")));
+            Messages.CREATE_MINIMUM_AMOUNT.send(player, "{MIN_BET}", TextUtil.numberFormat(config.getLong("settings.minimum-bet")));
             return;
         }
 
         final List<EconomyProvider> providers = new ArrayList<>(economyManager.getEconomyProviders().values());
         if (providers.isEmpty()) {
-            player.sendMessage(ColorUtil.color("&cThere are no economy providers found or not enabled in the configuration. Please contact an administrator."));
+            player.sendMessage(TextUtil.color("&cThere are no economy providers found or not enabled in the configuration. Please contact an administrator."));
             return;
         }
 
@@ -183,7 +195,10 @@ public class CoinflipCommand extends BaseCommand {
         }
 
         if (provider == null) {
-            Messages.INVALID_CURRENCY.send(player,"{CURRENCY_TYPES}", economyManager.getEconomyProviders().values().stream().map(p -> p.getDisplayName().toLowerCase()).collect(Collectors.joining(", ")));
+            Messages.INVALID_CURRENCY.send(player, "{CURRENCY_TYPES}",
+                economyManager.getEconomyProviders().values().stream()
+                    .map(p -> p.getDisplayName().toLowerCase())
+                    .collect(Collectors.joining(", ")));
             return;
         }
 
@@ -192,25 +207,32 @@ public class CoinflipCommand extends BaseCommand {
 
             final CoinflipCreatedEvent event = new CoinflipCreatedEvent(player, coinflipGame);
             Bukkit.getPluginManager().callEvent(event);
-            if(event.isCancelled()) return;
+            if (event.isCancelled()) {
+                return;
+            }
 
-            provider.withdraw(player, amount);
+            provider.withdraw(player, (double) amount);
             gameManager.addCoinflipGame(player.getUniqueId(), coinflipGame);
 
             if (config.getBoolean("settings.broadcast-coinflip-creation")) {
                 Bukkit.getOnlinePlayers().forEach(onlinePlayer -> {
-                    java.util.Optional<PlayerData> playerDataOptional = plugin.getStorageManager().getPlayer(player.getUniqueId());
+                    java.util.Optional<PlayerData> playerDataOptional = plugin.getStorageManager().getPlayer(onlinePlayer.getUniqueId());
 
                     if (playerDataOptional.isPresent()) {
                         PlayerData playerData = playerDataOptional.get();
                         if (playerData.isDisplayBroadcastMessages()) {
-                            Messages.COINFLIP_CREATED_BROADCAST.send(onlinePlayer, "{PLAYER}", player.getName(), "{CURRENCY}", provider.getDisplayName(), "{AMOUNT}", TextUtil.numberFormat(amount));
+                            Messages.COINFLIP_CREATED_BROADCAST.send(onlinePlayer,
+                                "{PLAYER}", player.getName(),
+                                "{CURRENCY}", provider.getDisplayName(),
+                                "{AMOUNT}", TextUtil.numberFormat(amount));
                         }
                     }
                 });
             }
 
-            Messages.CREATED_GAME.send(player, "{CURRENCY}", provider.getDisplayName(), "{AMOUNT}", TextUtil.numberFormat(amount));
+            Messages.CREATED_GAME.send(player,
+                "{CURRENCY}", provider.getDisplayName(),
+                "{AMOUNT}", TextUtil.numberFormat(amount));
         } else {
             Messages.INSUFFICIENT_FUNDS.send(player);
         }
@@ -218,8 +240,11 @@ public class CoinflipCommand extends BaseCommand {
 
     private EconomyProvider getProviderByName(String name) {
         for (EconomyProvider provider : economyManager.getEconomyProviders().values()) {
-            if (name.equalsIgnoreCase(provider.getDisplayName())) return provider;
+            if (name.equalsIgnoreCase(provider.getDisplayName())) {
+                return provider;
+            }
         }
+
         return null;
     }
 }

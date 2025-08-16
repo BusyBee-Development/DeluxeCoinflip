@@ -5,9 +5,9 @@
 
 package net.zithium.deluxecoinflip.economy.provider.impl;
 
+import net.milkbowl.vault.economy.Economy;
 import net.zithium.deluxecoinflip.DeluxeCoinflipPlugin;
 import net.zithium.deluxecoinflip.economy.provider.EconomyProvider;
-import net.milkbowl.vault.economy.Economy;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;

@@ -54,7 +54,7 @@ public interface StorageHandler {
      *
      * @param uuid the UUID of the game owner
      */
-    void deleteCoinfip(final UUID uuid);
+    void deleteCoinflip(final UUID uuid);
 
     /**
      * Gets all cached or active coinflip games.

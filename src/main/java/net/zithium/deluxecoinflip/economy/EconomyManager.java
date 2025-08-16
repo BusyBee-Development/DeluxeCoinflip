@@ -17,7 +17,6 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.logging.Logger;
-import java.util.stream.Stream;
 
 public class EconomyManager {
 
@@ -33,9 +32,13 @@ public class EconomyManager {
      * Load economies
      */
     public void onEnable() {
-        if (!economyProviders.isEmpty()) economyProviders.clear();
+        if (!economyProviders.isEmpty()) {
+            economyProviders.clear();
+        }
 
-        ConfigurationSection section = plugin.getConfigHandler(ConfigType.CONFIG).getConfig().getConfigurationSection("settings.providers");
+        ConfigurationSection section = plugin.getConfigHandler(ConfigType.CONFIG)
+                .getConfig()
+                .getConfigurationSection("settings.providers");
         Logger logger = plugin.getLogger();
         if (section == null) {
             logger.severe("There are no enabled providers set in the config. Plugin will now disable..");
@@ -43,18 +46,15 @@ public class EconomyManager {
             return;
         }
 
-        Stream.of(
-                new VaultProvider(),
-                new TokenEnchantProvider(),
-                new TokenManagerProvider(),
-                new ZithiumMobcoinsProvider(),
-                new PlayerPointsProvider(),
-                new BeastTokensProvider()
-        ).forEach(provider -> registerEconomyProvider(provider, provider.getIdentifier()));
+        registerEconomyProvider(new VaultProvider(), "Vault");
+        registerEconomyProvider(new TokenEnchantProvider(), "TokenEnchant");
+        registerEconomyProvider(new TokenManagerProvider(), "TokenManager");
+        registerEconomyProvider(new ZithiumMobcoinsProvider(), "ZithiumMobcoins");
+        registerEconomyProvider(new PlayerPointsProvider(), "PlayerPoints");
+        registerEconomyProvider(new BeastTokensProvider(), "BeastTokens");
 
-        // Register CustomCurrencyProvider
-        EconomyProvider customCurrencyProvider = new CustomCurrencyProvider("CUSTOM_CURRENCY", plugin);
-        registerEconomyProvider(customCurrencyProvider, null); // No required plugin for CUSTOM_CURRENCY
+        // CustomCurrencyProvider is command/placeholder based; no plugin dependency
+        registerEconomyProvider(new CustomCurrencyProvider("CUSTOM_CURRENCY", plugin), null);
 
         plugin.getScheduler().runTask(() -> {
             for (EconomyProvider provider : new ArrayList<>(economyProviders.values())) {
@@ -91,7 +91,7 @@ public class EconomyManager {
             }
         } else {
             economyProviders.put(provider.getIdentifier().toUpperCase(), provider);
-            plugin.getLogger().info("Registered economy provider '" + provider.getIdentifier());
+            plugin.getLogger().info("Registered economy provider '" + provider.getIdentifier() + "'");
         }
     }
 

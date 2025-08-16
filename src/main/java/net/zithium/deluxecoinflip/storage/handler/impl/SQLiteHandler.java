@@ -30,20 +30,39 @@ public class SQLiteHandler implements StorageHandler {
     private DeluxeCoinflipPlugin plugin;
     private File file;
 
-    private final String TABLE_NAME = "players";
-
     @Override
     public boolean onEnable(final DeluxeCoinflipPlugin plugin) {
         this.plugin = plugin;
+
+        if (!plugin.getDataFolder().exists()) {
+            boolean made = plugin.getDataFolder().mkdirs();
+            if (!made && !plugin.getDataFolder().exists()) {
+                plugin.getLogger().severe("Could not create plugin data folder: " + plugin.getDataFolder().getAbsolutePath());
+                return false;
+            }
+        }
+
         file = new File(plugin.getDataFolder(), "database.db");
         if (!file.exists()) {
             try {
-                file.createNewFile();
+                boolean created = file.createNewFile();
+                if (!created && !file.exists()) {
+                    plugin.getLogger().severe("Could not create database file: " + file.getAbsolutePath());
+                    return false;
+                }
             } catch (IOException e) {
                 plugin.getLogger().log(Level.SEVERE, "Error occurred while creating the database file.", e);
                 return false;
             }
         }
+
+        try {
+            Class.forName("org.sqlite.JDBC");
+        } catch (ClassNotFoundException e) {
+            plugin.getLogger().log(Level.SEVERE, "SQLite JDBC driver not found.", e);
+            return false;
+        }
+
         createTable();
         return true;
     }
@@ -54,26 +73,44 @@ public class SQLiteHandler implements StorageHandler {
 
         Map<UUID, PlayerData> playerDataMap = DeluxeCoinflipPlugin.getInstance().getStorageManager().getPlayerDataMap();
 
-        for (PlayerData player : new ArrayList<>(playerDataMap.values())) {
-            savePlayer(player);
-        }
+        try (Connection c = getConnection()) {
+            c.setAutoCommit(false);
+            String sql = "REPLACE INTO players (uuid, wins, losses, profit, total_loss, total_gambled, broadcasts) VALUES (?, ?, ?, ?, ?, ?, ?);";
+            try (PreparedStatement preparedStatement = c.prepareStatement(sql)) {
+                for (PlayerData player : new ArrayList<>(playerDataMap.values())) {
+                    preparedStatement.setString(1, player.getUUID().toString());
+                    preparedStatement.setInt(2, player.getWins());
+                    preparedStatement.setInt(3, player.getLosses());
+                    preparedStatement.setLong(4, player.getProfit());
+                    preparedStatement.setLong(5, player.getTotalLosses());
+                    preparedStatement.setLong(6, player.getTotalGambled());
+                    preparedStatement.setBoolean(7, player.isDisplayBroadcastMessages());
+                    preparedStatement.addBatch();
+                }
 
-        playerDataMap.clear();
+                preparedStatement.executeBatch();
+            }
+            c.commit();
+        } catch (SQLException e) {
+            plugin.getLogger().log(Level.SEVERE, "Error occurred while saving player data on shutdown.", e);
+        } finally {
+            playerDataMap.clear();
+        }
     }
 
     public Connection getConnection() {
         try {
-            Class.forName("org.sqlite.JDBC");
-            return DriverManager.getConnection("jdbc:sqlite:" + file);
-        } catch (SQLException | ClassNotFoundException ex) {
+            return DriverManager.getConnection("jdbc:sqlite:" + file.getAbsolutePath());
+        } catch (SQLException ex) {
             plugin.getLogger().log(Level.SEVERE, "Error occurred while setting up the database connection.", ex);
-            return null;
+            throw new IllegalStateException("Unable to open SQLite connection", ex);
         }
     }
 
-    private synchronized void createTable() {
+    private void createTable() {
         try (Connection tableConnection = getConnection();
              Statement statement = tableConnection.createStatement()) {
+            String TABLE_NAME = "players";
             String createPlayersTable = "CREATE TABLE IF NOT EXISTS " + TABLE_NAME + " (" +
                     "uuid VARCHAR(255) NOT NULL PRIMARY KEY, " +
                     "wins INTEGER, " +
@@ -95,8 +132,8 @@ public class SQLiteHandler implements StorageHandler {
     }
 
     @Override
-    public synchronized PlayerData getPlayer(final UUID uuid) {
-        String sql = "SELECT wins, losses, profit, total_loss, total_gambled, broadcasts FROM players WHERE uuid=?;";
+    public PlayerData getPlayer(final UUID uuid) {
+        String sql = "SELECT wins, losses, profit, total_loss, total_gambled, broadcasts FROM players WHERE uuid = ?;";
         try (Connection playerConnection = getConnection();
              PreparedStatement preparedStatement = playerConnection.prepareStatement(sql)) {
             preparedStatement.setString(1, uuid.toString());
@@ -116,12 +153,13 @@ public class SQLiteHandler implements StorageHandler {
         } catch (SQLException e) {
             plugin.getLogger().log(Level.SEVERE, "Error occurred while attempting to get a player's data.", e);
         }
+
         return new PlayerData(uuid);
     }
 
     @Override
-    public synchronized void savePlayer(final PlayerData player) {
-        String sql = "REPLACE INTO players (uuid, wins, losses, profit, total_loss, total_gambled, broadcasts) VALUES (?, ?, ?, ?, ?, ?, ?)";
+    public void savePlayer(final PlayerData player) {
+        String sql = "REPLACE INTO players (uuid, wins, losses, profit, total_loss, total_gambled, broadcasts) VALUES (?, ?, ?, ?, ?, ?, ?);";
         try (Connection playerConnection = getConnection();
              PreparedStatement preparedStatement = playerConnection.prepareStatement(sql)) {
             preparedStatement.setString(1, player.getUUID().toString());
@@ -138,8 +176,8 @@ public class SQLiteHandler implements StorageHandler {
     }
 
     @Override
-    public synchronized void saveCoinflip(CoinflipGame game) {
-        String sql = "REPLACE INTO games (uuid, provider, amount) VALUES (?, ?, ?)";
+    public void saveCoinflip(CoinflipGame game) {
+        String sql = "REPLACE INTO games (uuid, provider, amount) VALUES (?, ?, ?);";
         try (Connection coinflipConnection = getConnection();
              PreparedStatement preparedStatement = coinflipConnection.prepareStatement(sql)) {
             preparedStatement.setString(1, game.getPlayerUUID().toString());
@@ -152,8 +190,8 @@ public class SQLiteHandler implements StorageHandler {
     }
 
     @Override
-    public synchronized void deleteCoinfip(UUID uuid) {
-        String sql = "DELETE FROM games WHERE uuid=?;";
+    public void deleteCoinflip(UUID uuid) {
+        String sql = "DELETE FROM games WHERE uuid = ?;";
         try (Connection coinflipConnection = getConnection();
              PreparedStatement preparedStatement = coinflipConnection.prepareStatement(sql)) {
             preparedStatement.setString(1, uuid.toString());
@@ -164,7 +202,7 @@ public class SQLiteHandler implements StorageHandler {
     }
 
     @Override
-    public synchronized Map<UUID, CoinflipGame> getGames() {
+    public Map<UUID, CoinflipGame> getGames() {
         Map<UUID, CoinflipGame> games = new HashMap<>();
         String sql = "SELECT uuid, provider, amount FROM games;";
         try (Connection gamesConnection = getConnection();
@@ -179,26 +217,28 @@ public class SQLiteHandler implements StorageHandler {
         } catch (SQLException e) {
             plugin.getLogger().log(Level.SEVERE, "Error occurred while attempting to get all coinflip games.", e);
         }
+
         return games;
     }
 
     @Override
     public CoinflipGame getCoinflipGame(@NotNull UUID uuid) {
-        final String SQL = "SELECT * FROM games WHERE uuid = ?";
-
-        try (Connection GAME_CONNECTION = getConnection();
-             PreparedStatement preparedStatement = GAME_CONNECTION.prepareStatement(SQL)) {
+        final String sql = "SELECT provider, amount FROM games WHERE uuid = ?;";
+        try (Connection gameConnection = getConnection();
+             PreparedStatement preparedStatement = gameConnection.prepareStatement(sql)) {
             preparedStatement.setString(1, uuid.toString());
-            ResultSet resultSet = preparedStatement.executeQuery();
-            if (resultSet.next()) {
-                String provider = resultSet.getString("provider");
-                long amount = resultSet.getLong("amount");
+            try (ResultSet resultSet = preparedStatement.executeQuery()) {
+                if (!resultSet.next()) {
+                    return null;
+                }
+
+                final String provider = resultSet.getString("provider");
+                final long amount = resultSet.getLong("amount");
                 return new CoinflipGame(uuid, provider, amount);
             }
         } catch (SQLException e) {
             plugin.getLogger().log(Level.SEVERE, "Error occurred while attempting to get a coinflip game.", e);
+            return null;
         }
-
-        return null;
     }
 }
