@@ -11,7 +11,6 @@ import net.zithium.deluxecoinflip.config.Messages;
 import net.zithium.deluxecoinflip.economy.EconomyManager;
 import net.zithium.deluxecoinflip.economy.provider.EconomyProvider;
 import net.zithium.deluxecoinflip.game.CoinflipGame;
-import org.bukkit.OfflinePlayer;
 import org.bukkit.Server;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -70,17 +69,9 @@ public final class ActiveGameQuitListener implements Listener {
                         "{CURRENCY}", game.getProvider()
                 );
             }
-        }
 
-        this.plugin.getScheduler().runTaskAsynchronously(() -> {
-            final EconomyProvider economyQuitProvider = this.plugin.getEconomyManager().getEconomyProvider(game.getProvider());
-            if (economyQuitProvider != null) {
-                for (UUID participantId : participants) {
-                    final OfflinePlayer offline = server.getOfflinePlayer(participantId);
-                    economyQuitProvider.deposit(offline, amount);
-                }
-            }
-        });
+            economyProvider.deposit(server.getOfflinePlayer(participantId), amount);
+        }
 
         this.plugin.getGameManager().removeCoinflipGame(game.getPlayerUUID());
     }
