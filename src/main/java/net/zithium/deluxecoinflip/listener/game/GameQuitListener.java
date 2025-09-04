@@ -10,6 +10,7 @@ import net.zithium.deluxecoinflip.config.Messages;
 import net.zithium.deluxecoinflip.economy.EconomyManager;
 import net.zithium.deluxecoinflip.economy.provider.EconomyProvider;
 import net.zithium.deluxecoinflip.game.CoinflipGame;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -17,6 +18,7 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Locale;
+import java.util.UUID;
 
 public record GameQuitListener(DeluxeCoinflipPlugin plugin) implements Listener {
 
@@ -38,15 +40,16 @@ public record GameQuitListener(DeluxeCoinflipPlugin plugin) implements Listener 
         final EconomyProvider economyProvider = economyManager.getEconomyProvider(game.getProvider());
         if (economyProvider == null) {
             plugin.getLogger().warning("[DeluxeCoinflip] Missing economy provider '" + game.getProvider() + "'; refund skipped for " + quitter.getName() + ".");
-            plugin.getStorageManager().getStorageHandler().deleteCoinflip(game.getPlayerUUID());
-            plugin.getGameManager().removeCoinflipGame(game.getPlayerUUID());
+            final UUID uuid = game.getPlayerUUID();
+            plugin.getScheduler().runTaskAsynchronously(() -> plugin.getStorageManager().getStorageHandler().deleteCoinflip(uuid));
+            plugin.getGameManager().removeCoinflipGame(uuid);
             return;
         }
 
         final long amount = game.getAmount();
         final String amountFormatted = String.format(Locale.US, "%,d", amount);
-
-        economyProvider.deposit(game.getOfflinePlayer(), amount);
+        final UUID uuid = game.getPlayerUUID();
+        final OfflinePlayer offline = game.getOfflinePlayer();
 
         if (quitter.isOnline()) {
             Messages.GAME_REFUNDED.send(
@@ -56,7 +59,15 @@ public record GameQuitListener(DeluxeCoinflipPlugin plugin) implements Listener 
             );
         }
 
-        plugin.getStorageManager().getStorageHandler().deleteCoinflip(game.getPlayerUUID());
-        plugin.getGameManager().removeCoinflipGame(game.getPlayerUUID());
+        plugin.getScheduler().runTaskAsynchronously(() -> {
+            final EconomyProvider economyQuitProvider = plugin.getEconomyManager().getEconomyProvider(game.getProvider());
+            if (economyQuitProvider != null) {
+                economyQuitProvider.deposit(offline, amount);
+            }
+
+            plugin.getStorageManager().getStorageHandler().deleteCoinflip(uuid);
+        });
+
+        plugin.getGameManager().removeCoinflipGame(uuid);
     }
 }
