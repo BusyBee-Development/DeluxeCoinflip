@@ -20,7 +20,10 @@ import net.zithium.deluxecoinflip.economy.provider.EconomyProvider;
 import net.zithium.deluxecoinflip.game.CoinflipGame;
 import net.zithium.deluxecoinflip.game.GameManager;
 import net.zithium.deluxecoinflip.hook.DiscordHook;
-import net.zithium.deluxecoinflip.hook.PlaceholderAPIHook;
+import net.zithium.deluxecoinflip.hook.DeluxeCoinflipExpansion;
+import net.zithium.deluxecoinflip.placeholders.InternalDeluxePlaceholdersApi;
+import net.zithium.deluxecoinflip.placeholders.PlaceholderRegistry;
+import net.zithium.deluxecoinflip.api.DeluxePlaceholdersApi;
 import net.zithium.deluxecoinflip.listener.PlayerChatListener;
 import net.zithium.deluxecoinflip.listener.game.ActiveGameQuitListener;
 import net.zithium.deluxecoinflip.listener.game.GameQuitListener;
@@ -67,6 +70,10 @@ public class DeluxeCoinflipPlugin extends FoliaWrappedJavaPlugin implements Delu
 
     private GameShutdownProvider shutdownProvider;
 
+        // Placeholders
+        private PlaceholderRegistry placeholderRegistry;
+        private DeluxePlaceholdersApi placeholdersApi;
+
     @Override
     public void onEnable() {
         instance = this;
@@ -94,6 +101,18 @@ public class DeluxeCoinflipPlugin extends FoliaWrappedJavaPlugin implements Delu
         registerConfig(ConfigType.CONFIG);
         registerConfig(ConfigType.MESSAGES);
         Messages.setConfiguration(configMap.get(ConfigType.MESSAGES).getConfig());
+
+        // Initialize placeholder registry and public API (Bukkit Services)
+        this.placeholderRegistry = new PlaceholderRegistry(getLogger());
+        this.placeholdersApi = new InternalDeluxePlaceholdersApi(this.placeholderRegistry);
+        // Pre-register built-in labels
+        this.placeholderRegistry.register("HEARTS_WON", p -> "Hearts won");
+        this.placeholderRegistry.register("HEARTS_LOST", p -> "Hearts lost");
+        this.placeholderRegistry.register("HEARTS_BET", p -> "Hearts bet");
+        this.placeholderRegistry.register("WIN", p -> "Win");
+        this.placeholderRegistry.register("LOSSES", p -> "Losses");
+        // Expose via Bukkit services so other plugins can register their own placeholders
+        getServer().getServicesManager().register(net.zithium.deluxecoinflip.api.DeluxePlaceholdersApi.class, this.placeholdersApi, this, org.bukkit.plugin.ServicePriority.Normal);
 
         // Initialize economy manager early
         economyManager = new EconomyManager(this);
@@ -146,7 +165,7 @@ public class DeluxeCoinflipPlugin extends FoliaWrappedJavaPlugin implements Delu
         new GameQuitListener(this);
 
         if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
-            new PlaceholderAPIHook(this).register();
+            new DeluxeCoinflipExpansion(this).register();
             getLogger().log(Level.INFO, "Hooked into PlaceholderAPI successfully");
         }
 
@@ -222,6 +241,14 @@ public class DeluxeCoinflipPlugin extends FoliaWrappedJavaPlugin implements Delu
 
     public NamespacedKey getKey(String key) {
         return new NamespacedKey(this, key);
+    }
+
+    public PlaceholderRegistry getPlaceholderRegistry() {
+        return placeholderRegistry;
+    }
+
+    public DeluxePlaceholdersApi getPlaceholdersApi() {
+        return placeholdersApi;
     }
 
     // API methods

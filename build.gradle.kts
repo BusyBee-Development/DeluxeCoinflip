@@ -21,6 +21,8 @@ repositories {
 }
 
 dependencies {
+    testImplementation("org.junit.jupiter:junit-jupiter:5.10.3")
+        testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.10.3")
     implementation("co.aikar:acf-paper:0.5.1-SNAPSHOT")
     implementation("dev.triumphteam:triumph-gui:3.1.11")
     implementation("org.bstats:bstats-bukkit:3.1.0")
@@ -28,6 +30,8 @@ dependencies {
     implementation("com.github.NahuLD.folia-scheduler-wrapper:folia-scheduler-wrapper:v0.0.3")
 
     compileOnly("io.papermc.paper:paper-api:1.20.4-R0.1-SNAPSHOT")
+        testCompileOnly("io.papermc.paper:paper-api:1.20.4-R0.1-SNAPSHOT")
+            testRuntimeOnly("io.papermc.paper:paper-api:1.20.4-R0.1-SNAPSHOT")
 
     compileOnly("me.clip:placeholderapi:2.11.6")
     compileOnly("com.mojang:authlib:1.5.21")
@@ -48,6 +52,9 @@ tasks.compileJava {
 }
 
 tasks {
+    test {
+        useJUnitPlatform()
+    }
     build {
         dependsOn("shadowJar")
     }

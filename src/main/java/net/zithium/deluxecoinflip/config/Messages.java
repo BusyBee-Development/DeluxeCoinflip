@@ -85,7 +85,20 @@ public enum Messages {
             return;
         }
 
-        String colored = TextUtil.color(replace(message, replacements));
+        String intermediate = replace(message, replacements);
+                // Apply DeluxeCoinflip placeholders ({KEY} and %deluxecoinflip_key%)
+                try {
+                    net.zithium.deluxecoinflip.DeluxeCoinflipPlugin plugin = net.zithium.deluxecoinflip.DeluxeCoinflipPlugin.getInstance();
+                    if (plugin != null) {
+                        org.bukkit.entity.Player player = (receiver instanceof org.bukkit.entity.Player) ? (org.bukkit.entity.Player) receiver : null;
+                        net.zithium.deluxecoinflip.api.DeluxePlaceholdersApi api = plugin.getPlaceholdersApi();
+                        if (api != null) {
+                            intermediate = api.apply(intermediate, player);
+                        }
+                    }
+                } catch (Throwable ignored) { }
+
+                String colored = TextUtil.color(intermediate);
         if (colored == null || colored.isEmpty()) {
             return;
         }

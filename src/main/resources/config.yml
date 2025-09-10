@@ -16,7 +16,7 @@ storage:
 
 settings:
   # Min/max must be between 0 and 9,223,372,036,854,775,808
-  minimum-bet: 1000
+  minimum-bet: 1
   maximum-bet: 1000000
 
   # Aliases to the '/coinflip' command
@@ -30,7 +30,7 @@ settings:
   minimum-broadcast-winnings: 1000
 
   tax:
-    enabled: true
+    enabled: false
     rate: 5.0 # 5% tax
 
   # Economy providers
@@ -49,10 +49,21 @@ settings:
       enabled: true
       display_currency_name: "Money"
 
+    # LifestealCore Hearts integration via DeluxeLifestealBridge
+    hearts:
+      enabled: true
+      display_currency_name: "Hearts"
+      # This symbol will be used in messages with the {currency_symbol} placeholder
+      currency_symbol: "❤"
+      # --- GAME RULES FOR HEARTS ---
+      # These provider-specific settings override the global ones.
+      minimum_bet: 1
+      maximum_bet: 10
+
     # TokenEnchant Economy (requires TokenEnchant plugin)
     # https://polymart.org/resource/155
     TOKENENCHANT:
-      enabled: true
+      enabled: false
       display_currency_name: "TokenEnchant"
 
     # PlayerPoints Economy (requires PlayerPoints plugin)
@@ -64,19 +75,19 @@ settings:
     # TokenManager Economy (requires TokenManager plugin)
     # https://www.spigotmc.org/resources/8610/
     TOKENMANAGER:
-      enabled: true
+      enabled: false
       display_currency_name: "TokenManager"
 
     # ZithiumMobcoins integration (requires ZithiumMobcoins plugin)
     # https://www.spigotmc.org/resources/113153/
     ZITHIUMMOBCOINS:
-      enabled: true
+      enabled: false
       display_currency_name: "Mobcoins"
 
     # BeastTokens Economy (requires BeastTokens plugin)
     # https://www.spigotmc.org/resources/20806/
     BEASTTOKENS:
-      enabled: true
+      enabled: false
       display_currency_name: "Tokens"
 
     CUSTOM_CURRENCY:
@@ -158,62 +169,59 @@ coinflip-gui:
       pitch: 1.0
 
 games-gui:
-  title: "&lCOINFLIP GAMES"
+  title: "&8Coinflip Dashboard"
   rows: 4
 
   # You can add more items here
   filler-items:
-    border:
-      material: GRAY_STAINED_GLASS_PANE
-      display_name: "&r"
-      slots: [ 27, 28, 29, 33, 34 ]
     stats:
       slot: 31
       material: BOOK
-      display_name: "&6&l&nSTATISTICS"
+      display_name: "&e&lSTATISTICS"
       lore:
+        - "&7Coinflip Statistics"
         - ""
         - "&fHere you can view your statistics"
         - "&ffrom all your Coinflip games."
         - ""
-        - " &ePlayer: &f{PLAYER}"
+        - "&a✓ Wins: &a{WINS}"
+        - "&c⚡ Losses: &c{LOSSES}"
+        - "&b$ Profit: &b${PROFIT}"
+        - "&d☠ Win Percentage: &d{WIN_PERCENTAGE}%"
         - ""
-        - " &eWins: &f{WINS}"
-        - " &eLosses: &f{LOSSES}"
-        - " &eProfit: &f${PROFIT}"
-        - " &eTotal Lost: &f${TOTAL_LOSSES}"
-        - " &eTotal Gambled: &f${TOTAL_GAMBLED}"
-        - " &eWin Percentage: &f{WIN_PERCENTAGE}%"
+        - "&c&lHeart Statistics" # <-- YOUR NEW SECTION
+        - " &c❤ Hearts Won: &f%dlb_hearts_won%"
+        - " &c❤ Hearts Lost: &f%dlb_hearts_lost%"
+        - " &c❤ Hearts Wagered: &f%dlb_hearts_bet%"
 
   # Items below here are fixed, and the ID should not be removed/changed.
   create-new-game:
-    # Set false to disable the Game Builder GUI
     enabled: true
     slot: 35
     material: NETHER_STAR
-    display_name: "&a&lCreate Game"
+    display_name: "&e&lCREATE GAME"
     lore:
-      - "&7Click here to create a new game!"
+      - "&7Coinflip Games"
+      - ""
+      - "&e&l→ CLICK to Create"
   refresh:
     # Set false to disable the refresh button
-    enabled: true
-    slot: 27
+    enabled: false # Disabled as it's not present in the new design
+    slot: 0
     material: SUNFLOWER
     display_name: "&b&lRefresh"
     lore:
       - "&7Refresh the list."
   coinflip-game:
-    display_name: "&e{PLAYER}"
+    display_name: "&d{PLAYER}"
     material: PLAYER_HEAD
     lore:
+      - "&dCoinflip Game"
       - ""
-      - "&e&lWager"
-      - "  &f{AMOUNT}"
+      - "&fAmount: &d{AMOUNT}"
+      - "&fCurrency: &d{CURRENCY}"
       - ""
-      - "&e&lCurrency"
-      - "  &f{CURRENCY}"
-      - ""
-      - "&7&oClick here to start a Coinflip game"
+      - "&f~ CLICK to Play"
   no-games:
     slot: 13
     material: BARRIER
@@ -230,16 +238,20 @@ games-gui:
       - "&fYou do not have enough funds to play this coinflip"
   next-page:
     slot: 32
-    material: PAPER
-    display_name: "&2&lNext Page"
+    material: GREEN_WOOL
+    display_name: "&a&lNEXT PAGE"
     lore:
-      - "&7Click to go to the next page."
+      - "&7Information"
+      - ""
+      - "&e&l→ CLICK to Continue"
   previous-page:
     slot: 30
-    material: PAPER
-    display_name: "&c&lPrevious Page"
+    material: RED_WOOL
+    display_name: "&c&lPREVIOUS PAGE"
     lore:
-      - "&7Click to go to the previous page."
+      - "&7Information"
+      - ""
+      - "&e&l→ CLICK to Continue"
   sounds:
     # Played when the player tries to join a game but lacks funds.
     error_no_funds:
