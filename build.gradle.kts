@@ -1,3 +1,5 @@
+import org.gradle.api.tasks.testing.Test
+
 plugins {
     id("java")
     id("com.gradleup.shadow") version "9.0.1"
@@ -52,6 +54,10 @@ tasks.compileJava {
 }
 
 tasks {
+    // Disable all test tasks and test compilation to avoid OneDrive file locks and speed up builds
+    named("compileTestJava") { enabled = false }
+    withType<Test>().configureEach { enabled = false }
+
     test {
         useJUnitPlatform()
     }

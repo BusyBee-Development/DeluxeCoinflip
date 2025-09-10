@@ -105,12 +105,14 @@ public class DeluxeCoinflipPlugin extends FoliaWrappedJavaPlugin implements Delu
         // Initialize placeholder registry and public API (Bukkit Services)
         this.placeholderRegistry = new PlaceholderRegistry(getLogger());
         this.placeholdersApi = new InternalDeluxePlaceholdersApi(this.placeholderRegistry);
-        // Pre-register built-in labels
-        this.placeholderRegistry.register("HEARTS_WON", p -> "Hearts won");
-        this.placeholderRegistry.register("HEARTS_LOST", p -> "Hearts lost");
-        this.placeholderRegistry.register("HEARTS_BET", p -> "Hearts bet");
+        // Pre-register default providers for heart placeholders with safe fallbacks (overridable by bridges)
+        this.placeholderRegistry.register("HEARTS_WON", p -> "0");
+        this.placeholderRegistry.register("HEARTS_LOST", p -> "0");
+        this.placeholderRegistry.register("HEARTS_BET", p -> "0");
+        // Keep legacy label placeholders if used elsewhere
         this.placeholderRegistry.register("WIN", p -> "Win");
         this.placeholderRegistry.register("LOSSES", p -> "Losses");
+        getLogger().log(Level.FINE, "Registered default heart placeholders (fallback=0). External bridges may override via API.");
         // Expose via Bukkit services so other plugins can register their own placeholders
         getServer().getServicesManager().register(net.zithium.deluxecoinflip.api.DeluxePlaceholdersApi.class, this.placeholdersApi, this, org.bukkit.plugin.ServicePriority.Normal);
 

@@ -189,10 +189,10 @@ games-gui:
         - "&b$ Profit: &b${PROFIT}"
         - "&d☠ Win Percentage: &d{WIN_PERCENTAGE}%"
         - ""
-        - "&c&lHeart Statistics" # <-- YOUR NEW SECTION
-        - " &c❤ Hearts Won: &f%dlb_hearts_won%"
-        - " &c❤ Hearts Lost: &f%dlb_hearts_lost%"
-        - " &c❤ Hearts Wagered: &f%dlb_hearts_bet%"
+        - "&c&lHeart Statistics"
+        - " &c❤ Hearts Won: &f{HEARTS_WON}"
+        - " &c❤ Hearts Lost: &f{HEARTS_LOST}"
+        - " &c❤ Hearts Wagered: &f{HEARTS_BET}"
 
   # Items below here are fixed, and the ID should not be removed/changed.
   create-new-game:

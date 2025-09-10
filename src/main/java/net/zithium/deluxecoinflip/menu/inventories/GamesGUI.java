@@ -338,7 +338,11 @@ public class GamesGUI {
     }
 
     private String applyPlayerStats(String line, Player player, PlayerData data) {
-        return line
+        // First run through the placeholder registry (%deluxecoinflip_key% and {KEY})
+        String s = plugin.getPlaceholdersApi().apply(line, player);
+
+        // Then keep existing direct replacements for built-in stats
+        return s
                 .replace("{WINS}", String.valueOf(data.getWins()))
                 .replace("{LOSSES}", String.valueOf(data.getLosses()))
                 .replace("{PROFIT}", String.valueOf(data.getProfitFormatted()))

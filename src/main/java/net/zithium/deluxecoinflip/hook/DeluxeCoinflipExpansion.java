@@ -53,14 +53,14 @@ public class DeluxeCoinflipExpansion extends PlaceholderExpansion {
     public String onPlaceholderRequest(Player player, @NotNull String identifier) {
         if (player == null) return "";
 
-        // Hearts label placeholders (text labels, not numbers)
+        // Hearts placeholders: delegate to internal placeholder registry for real values
         switch (identifier.toLowerCase()) {
             case "hearts_won":
-                return "Hearts won";
+                return plugin.getPlaceholdersApi().apply("{HEARTS_WON}", player);
             case "hearts_lost":
-                return "Hearts lost";
+                return plugin.getPlaceholdersApi().apply("{HEARTS_LOST}", player);
             case "hearts_bet":
-                return "Hearts bet";
+                return plugin.getPlaceholdersApi().apply("{HEARTS_BET}", player);
         }
 
         Optional<PlayerData> playerDataOptional = storageManager.getPlayer(player.getUniqueId());
